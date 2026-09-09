@@ -360,6 +360,106 @@ class krmzyProvider : MainAPI() {
         return cleanUrl
     }
 
+    private suspend fun loadDailymotion(
+        input: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+        log: (String) -> Unit
+    ) {
+        val id = Regex("""dailymotion\.com/(?:embed/)?video/([a-zA-Z0-9_-]+)""")
+            .find(input)?.groupValues?.get(1) ?: input.trim()
+        if (id.isBlank()) {
+            log("Dailymotion ERROR: could not extract video id from $input")
+            return
+        }
+
+        val videoPageUrl = "https://www.dailymotion.com/video/$id"
+        val metadataUrl = "https://www.dailymotion.com/player/metadata/video/$id?embedder=" +
+            java.net.URLEncoder.encode(videoPageUrl, "UTF-8")
+
+        try {
+            log("Dailymotion: fetching metadata $metadataUrl")
+            val json = org.json.JSONObject(
+                app.get(metadataUrl, interceptor = cfInterceptor).text
+            )
+
+            val qualities = json.optJSONObject("qualities")
+            if (qualities == null) {
+                log("Dailymotion ERROR: no qualities in metadata. ${json.opt("error")}")
+                loadExtractor(videoPageUrl, "https://www.dailymotion.com/", subtitleCallback, callback)
+                return
+            }
+
+            var emitted = false
+            val groups = qualities.keys()
+            while (groups.hasNext()) {
+                val groupName = groups.next()
+                val entries = qualities.optJSONArray(groupName) ?: continue
+                for (i in 0 until entries.length()) {
+                    val entry = entries.optJSONObject(i) ?: continue
+                    val streamUrl = entry.optString("url").trim()
+                    val type = entry.optString("type")
+                    if (streamUrl.isBlank()) continue
+
+                    if (type.contains("mpegURL", ignoreCase = true) || streamUrl.contains(".m3u8")) {
+                        val qualityLinks = com.lagradost.cloudstream3.utils.M3u8Helper.generateM3u8(
+                            source = this.name,
+                            streamUrl = streamUrl,
+                            referer = "https://www.dailymotion.com/",
+                            headers = mapOf("Origin" to "https://www.dailymotion.com/")
+                        )
+                        if (qualityLinks.isNotEmpty()) {
+                            emitted = true
+                            qualityLinks.forEach { link ->
+                                callback.invoke(
+                                    newExtractorLink(
+                                        source = link.source,
+                                        name = "Dailymotion - ${link.name}",
+                                        url = link.url
+                                    ) {
+                                        this.referer = link.referer
+                                        this.quality = link.quality
+                                        this.headers = link.headers
+                                    }
+                                )
+                            }
+                        } else {
+                            emitted = true
+                            callback.invoke(
+                                newExtractorLink(source = this.name, name = "Dailymotion", url = streamUrl) {
+                                    this.quality = Qualities.Unknown.value
+                                    this.referer = "https://www.dailymotion.com/"
+                                    this.headers = mapOf(
+                                        "Origin" to "https://www.dailymotion.com/",
+                                        "Referer" to "https://www.dailymotion.com/"
+                                    )
+                                }
+                            )
+                        }
+                    } else if (type.contains("mp4", ignoreCase = true)) {
+                        emitted = true
+                        callback.invoke(
+                            newExtractorLink(source = this.name, name = "Dailymotion", url = streamUrl) {
+                                this.referer = "https://www.dailymotion.com/"
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (!emitted) {
+                log("Dailymotion: no usable stream entries, falling back to built-in extractor")
+                loadExtractor(videoPageUrl, "https://www.dailymotion.com/", subtitleCallback, callback)
+            }
+        } catch (t: Throwable) {
+            log("Dailymotion error: ${t.message}")
+            try {
+                loadExtractor(videoPageUrl, "https://www.dailymotion.com/", subtitleCallback, callback)
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -407,15 +507,11 @@ class krmzyProvider : MainAPI() {
             return true
         }
 
-        val extractorPage = try {
-            app.get(extractorUrl, referer = data, interceptor = cfInterceptor).document
-        } catch (t: Throwable) {
-            log("ERROR: failed to fetch extractor page: ${t.message}")
-            return false
-        }
-
-        val serverItems = extractorPage.select("ul.serversList li")
-        if (serverItems.isEmpty()) return false
+        data class ServerItem(
+            val name: String?,
+            val id: String?,
+            val codeHref: String?
+        )
 
         fun ensureHttp(u: String): String =
             when {
@@ -424,17 +520,59 @@ class krmzyProvider : MainAPI() {
                 else -> "https://$u"
             }
 
-        fun dailymotionFromLi(li: org.jsoup.nodes.Element): String? {
-            val a = li.selectFirst("code a")
-            if (a != null) return a.attr("href")
-            val code = li.selectFirst("code")?.text()
-            return code?.takeIf { it.isNotBlank() }
+        suspend fun serversFromEpisodePayload(href: String): List<ServerItem> {
+            val b64 = Regex("""[?&]post=([^&"']+)""").find(href)?.groupValues?.get(1) ?: return emptyList()
+            val jsonText = try {
+                val normalized = b64.replace('-', '+').replace('_', '/')
+                val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
+                String(android.util.Base64.decode(padded, android.util.Base64.DEFAULT), Charsets.UTF_8)
+            } catch (t: Throwable) {
+                log("Payload decode error: ${t.message}")
+                return emptyList()
+            }
+            return try {
+                val servers = org.json.JSONObject(jsonText).optJSONArray("servers") ?: return emptyList()
+                (0 until servers.length()).mapNotNull { i ->
+                    val s = servers.optJSONObject(i) ?: return@mapNotNull null
+                    ServerItem(s.optString("name"), s.optString("id"), null)
+                }
+            } catch (t: Throwable) {
+                log("Payload parse error: ${t.message}")
+                emptyList()
+            }
         }
 
-        for (li in serverItems) {
-            val serverIdRaw = li.attr("data-server").ifBlank { li.attr("data-server-id") }
-            val serverTypeRaw = li.attr("data-name").ifBlank { li.attr("data-type") }.trim()
+        suspend fun serversFromQesenPage(url: String): List<ServerItem> {
+            val normalizedUrl = url.replace("qesen.net/krmzi?", "qesen.net/krmzi/?")
+            val extractorPage = try {
+                app.get(normalizedUrl, referer = data, interceptor = cfInterceptor).document
+            } catch (t: Throwable) {
+                log("ERROR: failed to fetch extractor page: ${t.message}")
+                return emptyList()
+            }
+            return extractorPage.select("ul.serversList li").mapNotNull { li ->
+                val id = li.attr("data-server").ifBlank { li.attr("data-server-id") }.trim()
+                ServerItem(
+                    name = li.attr("data-name").ifBlank { li.attr("data-type") }.trim(),
+                    id = id.ifBlank { null },
+                    codeHref = li.selectFirst("code a")?.attr("href")
+                )
+            }
+        }
+
+        val serverItems = serversFromEpisodePayload(extractorUrl).ifEmpty {
+            serversFromQesenPage(extractorUrl)
+        }
+        if (serverItems.isEmpty()) {
+            log("No servers found on episode page payload or extractor page.")
+            return false
+        }
+        log("Found ${serverItems.size} server(s)")
+
+        for (item in serverItems) {
+            val serverTypeRaw = (item.name ?: "").trim()
             val serverType = serverTypeRaw.lowercase().trim()
+            val serverIdRaw = item.id ?: ""
 
             var embedUrl: String? = null
             try {
@@ -442,7 +580,7 @@ class krmzyProvider : MainAPI() {
                     "youtube" -> "https://www.youtube.com/watch?v=$serverIdRaw"
                     "youtube_in" -> "https://www.youtube.com/embed/$serverIdRaw"
                     "express" -> serverIdRaw.ifBlank { null }
-                    "dailymotion" -> dailymotionFromLi(li)
+                    "dailymotion" -> item.codeHref ?: serverIdRaw.ifBlank { null }
                     "facebook" -> "https://app.videas.fr/embed/media/$serverIdRaw"
                     "estream" -> "https://arabveturk.com/embed-$serverIdRaw.html"
                     "arab hd", "arabhd", "arab-hd" -> "https://v.turkvearab.com/embed-$serverIdRaw.html"
@@ -452,15 +590,7 @@ class krmzyProvider : MainAPI() {
                     "red hd", "redhd", "red-hd" -> "https://iplayerhls.com/e/$serverIdRaw"
                     "pro hd", "prohd", "pro-hd" -> "https://ebtv.upns.live/#$serverIdRaw"
                     "pro" -> "https://mdna.upns.online/#$serverIdRaw"
-                    else -> {
-                        val fallbackHref = li.selectFirst("a")?.attr("href")
-                        val fallbackData = li.attr("data-src")
-                        when {
-                            !fallbackHref.isNullOrBlank() -> fallbackHref
-                            !fallbackData.isNullOrBlank() -> fallbackData
-                            else -> null
-                        }
-                    }
+                    else -> item.codeHref ?: serverIdRaw.ifBlank { null }
                 }
 
                 if (!embedUrl.isNullOrBlank()) {
@@ -514,6 +644,15 @@ class krmzyProvider : MainAPI() {
                                     this.quality = Qualities.Unknown.value
                                 }
                             )
+                        }
+
+                        "dailymotion" -> {
+                            log("Processing Dailymotion server: $embedUrl")
+                            try {
+                                loadDailymotion(embedUrl, subtitleCallback, callback, ::log)
+                            } catch (t: Throwable) {
+                                log("Error in Dailymotion extraction: ${t.message}")
+                            }
                         }
 
                         else -> {
