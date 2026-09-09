@@ -14,7 +14,7 @@ import com.lagradost.cloudstream3.utils.M3u8Helper
 import java.net.URI
 
 class krmzyProvider : MainAPI() {
-    override var mainUrl = "https://krmzi.org"
+    override var mainUrl = "https://krmzy.com"
     override var name = "قرمزي"
     override val hasMainPage = true
     override var lang = "ar"
@@ -48,7 +48,7 @@ class krmzyProvider : MainAPI() {
     ): HomePageResponse {
 
         val document = app.get(request.data + page, interceptor = cfInterceptor).document
-        val home = document.select("article.postEp").mapNotNull {
+        val home = document.select("div.block-post").mapNotNull {
             it.toSearchResponse()
         }
         return newHomePageResponse(request.name, home)
