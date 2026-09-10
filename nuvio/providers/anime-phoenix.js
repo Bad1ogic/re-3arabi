@@ -1,6 +1,6 @@
 /**
  * Anime-Phoenix - Built from nuvio/src/providers/anime-phoenix.js
- * Generated: 2026-09-10T17:30:13.300Z
+ * Generated: 2026-09-10T17:45:05.452Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

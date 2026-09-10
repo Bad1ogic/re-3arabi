@@ -1,6 +1,6 @@
 /**
  * Elif - Built from nuvio/src/providers/elif.js
- * Generated: 2026-09-10T17:30:13.477Z
+ * Generated: 2026-09-10T17:45:05.635Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -388,40 +388,39 @@ var require_extractor = __commonJS({
           Origin: `https://${domain}`,
           Accept: "application/json, text/plain, */*"
         };
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const body = yield fetchText2(apiUrl, { headers });
-            for (const iv of generateIvCandidates(domain, videoId)) {
-              const plain = decryptSmartPlayer(body, iv);
-              if (plain) {
-                let source = "";
-                try {
-                  const parsed = JSON.parse(plain);
-                  source = parsed.source || "";
-                } catch (e) {
-                  source = "";
-                }
-                if (!source) {
-                  const m1 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+\.m3u8)/);
-                  const m2 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+)/);
-                  source = m1 ? m1[1] : m2 ? m2[1] : "";
-                  if (source) source = "https://" + source;
-                }
-                if (source) {
-                  streams.push(toStream("SmartPlayer", "SmartPlayer", cleanStreamUrl(source), "auto", { Referer: `https://${domain}/` }));
-                  return streams;
-                }
+        try {
+          const body = yield fetchText2(apiUrl, { headers });
+          for (const iv of generateIvCandidates(domain, videoId)) {
+            const plain = decryptSmartPlayer(body, iv);
+            if (plain) {
+              let source = "";
+              try {
+                const parsed = JSON.parse(plain);
+                source = parsed.source || "";
+              } catch (e) {
+                source = "";
+              }
+              if (!source) {
+                const m1 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+\.m3u8)/);
+                const m2 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+)/);
+                source = m1 ? m1[1] : m2 ? m2[1] : "";
+                if (source) source = "https://" + source;
+              }
+              if (source) {
+                streams.push(toStream("SmartPlayer", "SmartPlayer", cleanStreamUrl(source), "auto", { Referer: `https://${domain}/` }));
+                return streams;
               }
             }
-          } catch (e) {
-            return streams;
           }
-          yield new Promise((r) => setTimeout(r, 800));
+        } catch (e) {
+          return streams;
         }
         return streams;
       });
     }
     var IGNORE_URLS = ["google.com/recaptcha", "google.com/ads", "googlesyndication.com", "googletagmanager.com", "doubleclick.net"];
+    var FILE_HOSTS = ["nitroflare.com", "bowfile.com", "1fichier.com", "ddownload.com", "mdiaload.com", "1cloudfile.com", "workupload.com", "gofile.io", "krakenfiles.com", "racaty.net", "mega.nz", "mediafire.com"];
+    var MAX_IFRAME_EXPANSIONS = 4;
     function collectIframes(pageUrl, html, referer, depth, visited) {
       return __async(this, null, function* () {
         const out = [];
@@ -430,13 +429,18 @@ var require_extractor = __commonJS({
         const iframeRe = /<iframe[^>]*?\ssrc=["']([^"']+)["']/gi;
         let m;
         while ((m = iframeRe.exec(html)) !== null) {
-          out.push(absoluteUrl2(pageUrl, m[1]));
+          const src = m[1];
+          if (FILE_HOSTS.some((h) => src.includes(h))) continue;
+          out.push(absoluteUrl2(pageUrl, src));
         }
-        const globs = [];
+        let expanded = 0;
+        const globs = /* @__PURE__ */ new Set();
         for (const src of out) {
+          if (globs.has(src)) continue;
+          globs.add(src);
           if (IGNORE_URLS.some((k) => src.includes(k))) continue;
-          if (src.startsWith(pageUrl) || globs.some((g) => g === src)) continue;
-          globs.push(src);
+          if (expanded >= MAX_IFRAME_EXPANSIONS) break;
+          expanded++;
           try {
             const sub = yield fetchText2(src, { headers: { Referer: referer } });
             const inner = yield extractStreamsFromText(sub, src, referer, depth + 1, visited);
@@ -479,7 +483,8 @@ var require_extractor = __commonJS({
     }
     function extractFromUrl2(url, referer) {
       return __async(this, null, function* () {
-        const fixed = url.startsWith("//") ? "https:" + url : url;
+        const fixed = String(url).startsWith("//") ? "https:" + url : url;
+        if (FILE_HOSTS.some((h) => fixed.includes(h))) return [];
         if (DIRECT_VIDEO.test(fixed)) {
           return [toStream("Extractor", "Direct", fixed, "auto", { Referer: referer })];
         }

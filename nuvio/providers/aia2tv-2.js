@@ -1,6 +1,6 @@
 /**
  * Asia2tv 2 - Built from nuvio/src/providers/aia2tv-2.js
- * Generated: 2026-09-10T17:30:13.146Z
+ * Generated: 2026-09-10T17:45:05.295Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

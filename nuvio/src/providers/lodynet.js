@@ -175,7 +175,10 @@ async function loadLinks(url) {
             const sourcesMatch = /sources\s*:\s*\[(.*?)\]/s.exec(body);
             if (sourcesMatch) {
               const src = sourcesMatch[1];
-              const files = [...src.matchAll(/file\s*:\s*"([^"]+)"/g)].map((m) => m[1]);
+              const files = [];
+              const fileRe = /file\s*:\s*"([^"]+)"/g;
+              let fm;
+              while ((fm = fileRe.exec(src)) !== null) files.push(fm[1]);
               for (const file of files) {
                 streams.push(toStream("LodyNet", /\.m3u8/i.test(file) ? "Vidlo HLS" : "Vidlo", cleanFile(file), "auto", { Referer: BASE + "/" }));
               }

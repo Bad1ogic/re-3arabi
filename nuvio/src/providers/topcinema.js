@@ -186,16 +186,25 @@ async function loadLinks(data) {
   }
 
   const streams = [];
-  for (const rawLink of Object.keys(links)) {
-    const referer = links[rawLink];
-    const finalLink = unwrapPlayUrl(rawLink);
-    try {
-      const found = await extractFromUrl(finalLink, referer);
-      for (const s of found) streams.push(s);
-    } catch (e) {
-      continue;
+  const rawLinks = Object.keys(links);
+  const CONCURRENCY = 4;
+  async function worker(queue) {
+    while (queue.length) {
+      const rawLink = queue.shift();
+      const referer = links[rawLink];
+      const finalLink = unwrapPlayUrl(rawLink);
+      try {
+        const found = await extractFromUrl(finalLink, referer);
+        for (const s of found) streams.push(s);
+      } catch (e) {
+        continue;
+      }
     }
   }
+  const queue = rawLinks.slice();
+  const workers = [];
+  for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) workers.push(worker(queue));
+  await Promise.all(workers);
   return streams;
 }
 

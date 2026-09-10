@@ -1,6 +1,6 @@
 /**
  * Cee - Built from nuvio/src/providers/cee.js
- * Generated: 2026-09-10T17:30:13.384Z
+ * Generated: 2026-09-10T17:45:05.538Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

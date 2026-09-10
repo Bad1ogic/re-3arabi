@@ -1,6 +1,6 @@
 /**
  * YouTube - Built from nuvio/src/providers/youtube.js
- * Generated: 2026-09-10T17:30:13.763Z
+ * Generated: 2026-09-10T17:45:05.921Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

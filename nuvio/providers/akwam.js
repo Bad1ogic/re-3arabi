@@ -1,6 +1,6 @@
 /**
  * Akwam - Built from nuvio/src/providers/akwam.js
- * Generated: 2026-09-10T17:30:13.270Z
+ * Generated: 2026-09-10T17:45:05.421Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {

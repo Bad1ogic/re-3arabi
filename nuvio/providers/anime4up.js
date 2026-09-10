@@ -1,6 +1,6 @@
 /**
  * Anime4up - Built from nuvio/src/providers/anime4up.js
- * Generated: 2026-09-10T17:30:13.323Z
+ * Generated: 2026-09-10T17:45:05.475Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

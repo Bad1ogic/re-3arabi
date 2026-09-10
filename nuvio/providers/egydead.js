@@ -1,6 +1,6 @@
 /**
  * Egydead - Built from nuvio/src/providers/egydead.js
- * Generated: 2026-09-10T17:30:13.465Z
+ * Generated: 2026-09-10T17:45:05.623Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

@@ -237,35 +237,32 @@ async function extractSmartPlayer(playerUrl, referer) {
     Origin: `https://${domain}`,
     Accept: "application/json, text/plain, */*"
   };
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const body = await fetchText(apiUrl, { headers });
-      for (const iv of generateIvCandidates(domain, videoId)) {
-        const plain = decryptSmartPlayer(body, iv);
-        if (plain) {
-          let source = "";
-          try {
-            const parsed = JSON.parse(plain);
-            source = parsed.source || "";
-          } catch (e) {
-            source = "";
-          }
-          if (!source) {
-            const m1 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+\.m3u8)/);
-            const m2 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+)/);
-            source = m1 ? m1[1] : m2 ? m2[1] : "";
-            if (source) source = "https://" + source;
-          }
-          if (source) {
-            streams.push(toStream("SmartPlayer", "SmartPlayer", cleanStreamUrl(source), "auto", { Referer: `https://${domain}/` }));
-            return streams;
-          }
+  try {
+    const body = await fetchText(apiUrl, { headers });
+    for (const iv of generateIvCandidates(domain, videoId)) {
+      const plain = decryptSmartPlayer(body, iv);
+      if (plain) {
+        let source = "";
+        try {
+          const parsed = JSON.parse(plain);
+          source = parsed.source || "";
+        } catch (e) {
+          source = "";
+        }
+        if (!source) {
+          const m1 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+\.m3u8)/);
+          const m2 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+)/);
+          source = m1 ? m1[1] : m2 ? m2[1] : "";
+          if (source) source = "https://" + source;
+        }
+        if (source) {
+          streams.push(toStream("SmartPlayer", "SmartPlayer", cleanStreamUrl(source), "auto", { Referer: `https://${domain}/` }));
+          return streams;
         }
       }
-    } catch (e) {
-      return streams;
     }
-    await new Promise((r) => setTimeout(r, 800));
+  } catch (e) {
+    return streams;
   }
   return streams;
 }
@@ -273,6 +270,8 @@ async function extractSmartPlayer(playerUrl, referer) {
 // ---- generic page -> streams ----------------------------------------------
 
 const IGNORE_URLS = ["google.com/recaptcha", "google.com/ads", "googlesyndication.com", "googletagmanager.com", "doubleclick.net"];
+const FILE_HOSTS = ["nitroflare.com", "bowfile.com", "1fichier.com", "ddownload.com", "mdiaload.com", "1cloudfile.com", "workupload.com", "gofile.io", "krakenfiles.com", "racaty.net", "mega.nz", "mediafire.com"];
+const MAX_IFRAME_EXPANSIONS = 4;
 
 async function collectIframes(pageUrl, html, referer, depth, visited) {
   const out = [];
@@ -281,13 +280,18 @@ async function collectIframes(pageUrl, html, referer, depth, visited) {
   const iframeRe = /<iframe[^>]*?\ssrc=["']([^"']+)["']/gi;
   let m;
   while ((m = iframeRe.exec(html)) !== null) {
-    out.push(absoluteUrl(pageUrl, m[1]));
+    const src = m[1];
+    if (FILE_HOSTS.some((h) => src.includes(h))) continue;
+    out.push(absoluteUrl(pageUrl, src));
   }
-  const globs = [];
+  let expanded = 0;
+  const globs = new Set();
   for (const src of out) {
+    if (globs.has(src)) continue;
+    globs.add(src);
     if (IGNORE_URLS.some((k) => src.includes(k))) continue;
-    if (src.startsWith(pageUrl) || globs.some((g) => g === src)) continue;
-    globs.push(src);
+    if (expanded >= MAX_IFRAME_EXPANSIONS) break;
+    expanded++;
     try {
       const sub = await fetchText(src, { headers: { Referer: referer } });
       const inner = await extractStreamsFromText(sub, src, referer, depth + 1, visited);
@@ -333,7 +337,8 @@ async function extractStreamsFromText(html, pageUrl, referer, depth, visited) {
 }
 
 async function extractFromUrl(url, referer) {
-  const fixed = url.startsWith("//") ? "https:" + url : url;
+  const fixed = String(url).startsWith("//") ? "https:" + url : url;
+  if (FILE_HOSTS.some((h) => fixed.includes(h))) return [];
   if (DIRECT_VIDEO.test(fixed)) {
     return [toStream("Extractor", "Direct", fixed, "auto", { Referer: referer })];
   }
