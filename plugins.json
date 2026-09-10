@@ -456,7 +456,7 @@
             "Bad1ogic"
         ],
         "description": "\u0627\u0644\u0628\u062d\u062b \u0644\u0627 \u064a\u0639\u0645\u0644 \u062d\u0627\u0644\u064a\u0627 \u0645\u0634\u0643\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0648\u0642\u0639",
-        "fileSize": 38050,
+        "fileSize": 43617,
         "repositoryUrl": "https://github.com/Bad1ogic/re-3arabi",
         "language": "ar",
         "tvTypes": [
@@ -465,7 +465,7 @@
         ],
         "iconUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwTnAJOvyri3uHzHxjkEdlaBBKs8MAvIuJtFmCoo9u5qYiuFpHZjcl6tDi&s=10",
         "apiVersion": 1,
-        "fileHash": "sha256-1151d82753d4aed10fe4c2458ea79edccb30b9d0523ff8cdce9b23f37ea4a02e"
+        "fileHash": "sha256-faa0f7efaedf0bed0c1e8b654e12f0b7e95cef3bc21e96bc1777ec2c51a93d1f"
     },
     {
         "url": "https://raw.githubusercontent.com/Bad1ogic/re-3arabi/builds/Lodynet.cs3",
