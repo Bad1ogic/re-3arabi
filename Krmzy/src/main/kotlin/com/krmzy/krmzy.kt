@@ -360,40 +360,6 @@ class krmzyProvider : MainAPI() {
         return cleanUrl
     }
 
-    private fun parseStreamInfAttributes(line: String): Map<String, String> {
-        val result = mutableMapOf<String, String>()
-        val attrRegex = Regex("""([A-Z0-9-]+)=(?:"([^"]*)"|([^,]*))""")
-        attrRegex.findAll(line.substringAfter(":").trim()).forEach { m ->
-            val key = m.groupValues[1]
-            val value = if (m.groupValues[2].isNotEmpty()) m.groupValues[2] else m.groupValues[3]
-            if (key.isNotEmpty()) result[key] = value
-        }
-        return result
-    }
-
-    private fun videoCodecName(codecs: String): String {
-        val c = codecs.lowercase()
-        return when {
-            c.contains("av01") -> "AV1"
-            c.contains("hvc1") || c.contains("hev1") -> "HEVC"
-            c.contains("avc") -> "H.264"
-            c.contains("vp9") || c.contains("vp09") -> "VP9"
-            c.contains("av1") -> "AV1"
-            else -> ""
-        }
-    }
-
-    private fun qualityForHeight(height: Int): Int =
-        when {
-            height >= 2160 -> Qualities.P2160.value
-            height >= 1440 -> Qualities.P1440.value
-            height >= 1080 -> Qualities.P1080.value
-            height >= 720 -> Qualities.P720.value
-            height >= 480 -> Qualities.P480.value
-            height > 0 -> Qualities.P360.value
-            else -> Qualities.Unknown.value
-        }
-
     private suspend fun loadDailymotion(
         input: String,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -436,57 +402,29 @@ class krmzyProvider : MainAPI() {
                     if (streamUrl.isBlank()) continue
 
                     if (type.contains("mpegURL", ignoreCase = true) || streamUrl.contains(".m3u8")) {
-                        emitted = true
-                        var parsedVariants = 0
-                        try {
-                            val masterText = app.get(
-                                streamUrl,
-                                referer = "https://www.dailymotion.com/",
-                                headers = mapOf(
-                                    "Origin" to "https://www.dailymotion.com/",
-                                    "Referer" to "https://www.dailymotion.com/"
-                                ),
-                                interceptor = cfInterceptor
-                            ).text
-                            var pendingAttrs: Map<String, String>? = null
-                            masterText.lines().forEach { rawLine ->
-                                val line = rawLine.trim()
-                                if (line.startsWith("#EXT-X-STREAM-INF:")) {
-                                    pendingAttrs = parseStreamInfAttributes(line)
-                                } else if (pendingAttrs != null && line.isNotEmpty() && !line.startsWith("#")) {
-                                    val attrs = pendingAttrs ?: return@forEach
-                                    pendingAttrs = null
-                                    val uri = try {
-                                        java.net.URI(streamUrl).resolve(line).toString()
-                                    } catch (t: Throwable) {
-                                        line
+                        val qualityLinks = com.lagradost.cloudstream3.utils.M3u8Helper.generateM3u8(
+                            source = this.name,
+                            streamUrl = streamUrl,
+                            referer = "https://www.dailymotion.com/",
+                            headers = mapOf("Origin" to "https://www.dailymotion.com/")
+                        )
+                        if (qualityLinks.isNotEmpty()) {
+                            emitted = true
+                            qualityLinks.forEach { link ->
+                                callback.invoke(
+                                    newExtractorLink(
+                                        source = link.source,
+                                        name = "Dailymotion - ${link.name}",
+                                        url = link.url
+                                    ) {
+                                        this.referer = link.referer
+                                        this.quality = link.quality
+                                        this.headers = link.headers
                                     }
-                                    val resolution = attrs["RESOLUTION"] ?: ""
-                                    val height = resolution.substringAfter("x").toIntOrNull() ?: 0
-                                    val bandwidth = attrs["BANDWIDTH"]?.toLongOrNull() ?: 0L
-                                    val codec = videoCodecName(attrs["CODECS"] ?: "")
-                                    val variantName = buildString {
-                                        append(if (height > 0) "${height}p" else "Auto")
-                                        if (codec.isNotEmpty()) append(" $codec")
-                                        if (bandwidth > 0) append(" (${(bandwidth / 1000).toInt()}kbps)")
-                                    }
-                                    callback.invoke(
-                                        newExtractorLink(source = this.name, name = variantName, url = uri) {
-                                            this.referer = "https://www.dailymotion.com/"
-                                            this.headers = mapOf(
-                                                "Origin" to "https://www.dailymotion.com/",
-                                                "Referer" to "https://www.dailymotion.com/"
-                                            )
-                                            this.quality = qualityForHeight(height)
-                                        }
-                                    )
-                                    parsedVariants++
-                                }
+                                )
                             }
-                        } catch (t: Throwable) {
-                            log("Dailymotion HLS parse error: ${t.message}")
-                        }
-                        if (parsedVariants == 0) {
+                        } else {
+                            emitted = true
                             callback.invoke(
                                 newExtractorLink(source = this.name, name = "Dailymotion", url = streamUrl) {
                                     this.quality = Qualities.Unknown.value
