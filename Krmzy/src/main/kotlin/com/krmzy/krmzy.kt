@@ -360,6 +360,75 @@ class krmzyProvider : MainAPI() {
         return cleanUrl
     }
 
+    private fun videoCodecName(codecs: String): String {
+        val c = codecs.lowercase()
+        return when {
+            c.contains("av01") -> "AV1"
+            c.contains("hvc1") || c.contains("hev1") -> "HEVC"
+            c.contains("avc") -> "H.264"
+            c.contains("vp9") || c.contains("vp09") -> "VP9"
+            c.contains("av1") -> "AV1"
+            else -> ""
+        }
+    }
+
+    private fun parseStreamInfAttributes(line: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val attrRegex = Regex("""([A-Z0-9-]+)=(?:"([^"]*)"|([^,]*))""")
+        attrRegex.findAll(line.substringAfter(":").trim()).forEach { m ->
+            val key = m.groupValues[1]
+            val value = if (m.groupValues[2].isNotEmpty()) m.groupValues[2] else m.groupValues[3]
+            if (key.isNotEmpty()) result[key] = value
+        }
+        return result
+    }
+
+    private fun stripQuery(u: String): String =
+        try {
+            java.net.URI(u).let { java.net.URI(it.scheme, it.authority, it.path, null, null).toString() }
+        } catch (t: Throwable) {
+            u.substringBefore("?")
+        }
+
+    private suspend fun fetchVariantCodecs(masterUrl: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val masterText = try {
+            app.get(
+                masterUrl,
+                referer = "https://www.dailymotion.com/",
+                headers = mapOf(
+                    "Origin" to "https://www.dailymotion.com/",
+                    "Referer" to "https://www.dailymotion.com/"
+                ),
+                interceptor = cfInterceptor
+            ).text
+        } catch (t: Throwable) {
+            return result
+        }
+
+        var pendingAttrs: Map<String, String>? = null
+        masterText.lines().forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                pendingAttrs = parseStreamInfAttributes(line)
+            } else if (pendingAttrs != null && line.isNotEmpty() && !line.startsWith("#")) {
+                val attrs = pendingAttrs ?: return@forEach
+                pendingAttrs = null
+                val codec = videoCodecName(attrs["CODECS"] ?: "")
+                if (codec.isNotEmpty()) {
+                    val uri = try {
+                        java.net.URI(masterUrl).resolve(line).toString()
+                    } catch (t: Throwable) {
+                        line
+                    }
+                    result[uri] = codec
+                    result[stripQuery(uri)] = codec
+                }
+            }
+        }
+        return result
+    }
+
     private suspend fun loadDailymotion(
         input: String,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -410,11 +479,18 @@ class krmzyProvider : MainAPI() {
                         )
                         if (qualityLinks.isNotEmpty()) {
                             emitted = true
+                            val codecs = fetchVariantCodecs(streamUrl)
                             qualityLinks.forEach { link ->
+                                val codec = codecs[link.url] ?: codecs[stripQuery(link.url)] ?: ""
+                                val linkName = if (codec.isNotEmpty()) {
+                                    "Dailymotion - ${link.name} $codec"
+                                } else {
+                                    "Dailymotion - ${link.name}"
+                                }
                                 callback.invoke(
                                     newExtractorLink(
                                         source = link.source,
-                                        name = "Dailymotion - ${link.name}",
+                                        name = linkName,
                                         url = link.url
                                     ) {
                                         this.referer = link.referer
