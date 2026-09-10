@@ -1,6 +1,6 @@
 /**
  * Syrialive - Built from nuvio/src/providers/syrialive.js
- * Generated: 2026-09-10T22:12:38.921Z
+ * Generated: 2026-09-10T22:20:43.202Z
  */
 
 // src/providers/syrialive.js

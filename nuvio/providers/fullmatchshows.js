@@ -1,6 +1,6 @@
 /**
  * FullMatchShows - Built from nuvio/src/providers/fullmatchshows.js
- * Generated: 2026-09-10T22:12:38.828Z
+ * Generated: 2026-09-10T22:20:43.118Z
  */
 
 // src/providers/fullmatchshows.js

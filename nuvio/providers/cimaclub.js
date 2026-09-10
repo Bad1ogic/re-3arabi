@@ -1,6 +1,6 @@
 /**
  * CimaClub - Built from nuvio/src/providers/cimaclub.js
- * Generated: 2026-09-10T22:12:38.688Z
+ * Generated: 2026-09-10T22:20:42.975Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -310,11 +310,12 @@ var require_extractor = __commonJS({
       for (const v of ordered) {
         const code = codecShort(v.codecs);
         const base = v.name || (v.height ? v.height + "p" : v.bandwidth ? Math.round(v.bandwidth / 1e3) + "kbps" : "auto");
+        const qualityBase = /^\d+$/.test(v.name || "") ? v.name : v.height ? v.height + "p" : "auto";
         const label = code ? base + " " + code : base;
+        const quality = code ? qualityBase + " " + code : qualityBase;
         const key = (v.height ? "h" + v.height : "b" + v.bandwidth) + "_" + (code || "u");
         if (seen.has(key)) continue;
         seen.add(key);
-        const quality = /^\d+$/.test(v.name || "") ? v.name : v.height ? v.height + "p" : "auto";
         out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
       }
       return out.length > 1 ? out : [stream];

@@ -1,6 +1,6 @@
 /**
  * Egydead - Built from nuvio/src/providers/egydead.js
- * Generated: 2026-09-10T22:12:38.756Z
+ * Generated: 2026-09-10T22:20:43.047Z
  */
 
 // src/providers/egydead.js

@@ -1,6 +1,6 @@
 /**
  * Anime3rb - Built from nuvio/src/providers/anime3rb.js
- * Generated: 2026-09-10T22:12:38.599Z
+ * Generated: 2026-09-10T22:20:42.883Z
  */
 
 // src/providers/anime3rb.js

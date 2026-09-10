@@ -1,6 +1,6 @@
 /**
  * Asia2tv 2 - Built from nuvio/src/providers/aia2tv-2.js
- * Generated: 2026-09-10T22:12:38.434Z
+ * Generated: 2026-09-10T22:20:42.712Z
  */
 
 // src/providers/aia2tv-2.js
