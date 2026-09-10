@@ -135,15 +135,8 @@ function parseMasterPlaylist(text, baseUrl) {
   return variants;
 }
 
-async function expandM3u8Qualities(stream) {
-  if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
-  let text;
-  try {
-    text = await fetchText(stream.url, { headers: stream.headers || {} });
-  } catch (e) {
-    return [stream];
-  }
-  if (!/^\s*#EXTM3U/.test(text)) return [stream];
+function expandFromMasterText(stream, text) {
+  if (!text || !/^\s*#EXTM3U/.test(text)) return [stream];
   const variants = parseMasterPlaylist(text, stream.url);
   if (!variants.length) return [stream];
 
@@ -171,6 +164,17 @@ async function expandM3u8Qualities(stream) {
     out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
   }
   return out.length > 1 ? out : [stream];
+}
+
+async function expandM3u8Qualities(stream) {
+  if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
+  let text;
+  try {
+    text = await fetchText(stream.url, { headers: stream.headers || {} });
+  } catch (e) {
+    return [stream];
+  }
+  return expandFromMasterText(stream, text);
 }
 
 async function extractDailymotion(url, headers) {
@@ -579,4 +583,4 @@ async function extractFromUrl(url, referer) {
   }
 }
 
-module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities };
+module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText };

@@ -7,50 +7,52 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 async function getMedia(tmdbId, mediaType) {
   const endpoint = mediaType === "tv" ? "tv" : "movie";
   try {
-    const res = await fetch(
-      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
-      { skipSizeCheck: true }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data && (data.title || data.name)) return data;
-    const resEn = await fetch(
-      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
-      { skipSizeCheck: true }
-    );
-    if (!resEn.ok) return null;
-    return await resEn.json();
+    const [resAr, resEn] = await Promise.all([
+      fetch(TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar", { skipSizeCheck: true }),
+      fetch(TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US", { skipSizeCheck: true })
+    ]);
+    if (resAr.ok) {
+      const data = await resAr.json();
+      if (data && (data.title || data.name)) return data;
+    }
+    if (resEn.ok) return await resEn.json();
+    return null;
   } catch (e) {
     console.error("[TMDB] getMedia error:", e.message);
     return null;
   }
 }
 
+async function fetchAlternativeTitles(tmdbId, mediaType) {
+  const endpoint = mediaType === "tv" ? "tv" : "movie";
+  try {
+    const res = await fetch(
+      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
+      { skipSizeCheck: true }
+    );
+    if (!res.ok) return [];
+    const alt = await res.json();
+    const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
+    return list.map((i) => i.title).filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
 async function getTitles(tmdbId, mediaType) {
-  const d = await getMedia(tmdbId, mediaType);
+  const [d, alts] = await Promise.all([
+    getMedia(tmdbId, mediaType),
+    fetchAlternativeTitles(tmdbId, mediaType)
+  ]);
   if (!d) return [];
   const titles = [];
   const primary = d.title || d.name || "";
   if (primary) titles.push(primary);
   const orig = d.original_title || d.original_name || "";
   if (orig && orig !== primary) titles.push(orig);
-  try {
-    const endpoint = mediaType === "tv" ? "tv" : "movie";
-    const res = await fetch(
-      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
-      { skipSizeCheck: true }
-    );
-    if (res.ok) {
-      const alt = await res.json();
-      const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
-      for (const item of list) {
-        const t = item.title;
-        if (!t) continue;
-        if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
-      }
-    }
-  } catch (e) {
-    // ignore alternative titles errors
+  for (const t of alts) {
+    if (typeof t !== "string" || !t) continue;
+    if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
   }
   return titles;
 }

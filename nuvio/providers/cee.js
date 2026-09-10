@@ -1,6 +1,6 @@
 /**
  * Cee - Built from nuvio/src/providers/cee.js
- * Generated: 2026-09-10T22:20:42.959Z
+ * Generated: 2026-09-10T22:36:41.270Z
  */
 
 // src/providers/cee.js

@@ -1,6 +1,6 @@
 /**
  * Elif - Built from nuvio/src/providers/elif.js
- * Generated: 2026-09-10T22:20:43.060Z
+ * Generated: 2026-09-10T22:36:41.364Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -116,48 +116,50 @@ var require_tmdb = __commonJS({
     async function getMedia(tmdbId, mediaType) {
       const endpoint = mediaType === "tv" ? "tv" : "movie";
       try {
-        const res = await fetch(
-          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
-          { skipSizeCheck: true }
-        );
-        if (!res.ok) return null;
-        const data = await res.json();
-        if (data && (data.title || data.name)) return data;
-        const resEn = await fetch(
-          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
-          { skipSizeCheck: true }
-        );
-        if (!resEn.ok) return null;
-        return await resEn.json();
+        const [resAr, resEn] = await Promise.all([
+          fetch(TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar", { skipSizeCheck: true }),
+          fetch(TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US", { skipSizeCheck: true })
+        ]);
+        if (resAr.ok) {
+          const data = await resAr.json();
+          if (data && (data.title || data.name)) return data;
+        }
+        if (resEn.ok) return await resEn.json();
+        return null;
       } catch (e) {
         console.error("[TMDB] getMedia error:", e.message);
         return null;
       }
     }
+    async function fetchAlternativeTitles(tmdbId, mediaType) {
+      const endpoint = mediaType === "tv" ? "tv" : "movie";
+      try {
+        const res = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
+          { skipSizeCheck: true }
+        );
+        if (!res.ok) return [];
+        const alt = await res.json();
+        const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
+        return list.map((i) => i.title).filter(Boolean);
+      } catch (e) {
+        return [];
+      }
+    }
     async function getTitles2(tmdbId, mediaType) {
-      const d = await getMedia(tmdbId, mediaType);
+      const [d, alts] = await Promise.all([
+        getMedia(tmdbId, mediaType),
+        fetchAlternativeTitles(tmdbId, mediaType)
+      ]);
       if (!d) return [];
       const titles = [];
       const primary = d.title || d.name || "";
       if (primary) titles.push(primary);
       const orig = d.original_title || d.original_name || "";
       if (orig && orig !== primary) titles.push(orig);
-      try {
-        const endpoint = mediaType === "tv" ? "tv" : "movie";
-        const res = await fetch(
-          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
-          { skipSizeCheck: true }
-        );
-        if (res.ok) {
-          const alt = await res.json();
-          const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
-          for (const item of list) {
-            const t = item.title;
-            if (!t) continue;
-            if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
-          }
-        }
-      } catch (e) {
+      for (const t of alts) {
+        if (typeof t !== "string" || !t) continue;
+        if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
       }
       return titles;
     }
@@ -285,15 +287,8 @@ var require_extractor = __commonJS({
       }
       return variants;
     }
-    async function expandM3u8Qualities(stream) {
-      if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
-      let text;
-      try {
-        text = await fetchText2(stream.url, { headers: stream.headers || {} });
-      } catch (e) {
-        return [stream];
-      }
-      if (!/^\s*#EXTM3U/.test(text)) return [stream];
+    function expandFromMasterText(stream, text) {
+      if (!text || !/^\s*#EXTM3U/.test(text)) return [stream];
       const variants = parseMasterPlaylist(text, stream.url);
       if (!variants.length) return [stream];
       const codecShort = (c) => {
@@ -319,6 +314,16 @@ var require_extractor = __commonJS({
         out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
       }
       return out.length > 1 ? out : [stream];
+    }
+    async function expandM3u8Qualities(stream) {
+      if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
+      let text;
+      try {
+        text = await fetchText2(stream.url, { headers: stream.headers || {} });
+      } catch (e) {
+        return [stream];
+      }
+      return expandFromMasterText(stream, text);
     }
     async function extractDailymotion(url, headers) {
       const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
@@ -680,7 +685,7 @@ var require_extractor = __commonJS({
         return [];
       }
     }
-    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities };
+    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText };
   }
 });
 

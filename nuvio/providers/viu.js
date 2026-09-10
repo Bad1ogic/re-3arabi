@@ -1,6 +1,6 @@
 /**
  * VIU - Built from nuvio/src/providers/viu.js
- * Generated: 2026-09-10T22:20:43.286Z
+ * Generated: 2026-09-10T22:36:41.593Z
  */
 
 // src/providers/viu.js

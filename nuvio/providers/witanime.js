@@ -1,6 +1,6 @@
 /**
  * Witanime - Built from nuvio/src/providers/witanime.js
- * Generated: 2026-09-10T22:20:43.315Z
+ * Generated: 2026-09-10T22:36:41.625Z
  */
 
 // src/providers/witanime.js

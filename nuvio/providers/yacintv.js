@@ -1,6 +1,6 @@
 /**
  * Yacintv - Built from nuvio/src/providers/yacintv.js
- * Generated: 2026-09-10T22:20:43.326Z
+ * Generated: 2026-09-10T22:36:41.637Z
  */
 
 // src/providers/yacintv.js

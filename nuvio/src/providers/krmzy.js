@@ -1,6 +1,6 @@
 const { fetchText, HEADERS, absoluteUrl } = require("../lib/http.js");
 const cheerio = require("cheerio-without-node-native");
-const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandM3u8Qualities } = require("../lib/extractor.js");
+const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities } = require("../lib/extractor.js");
 const { matchTitle } = require("../lib/normalize.js");
 const { getTitles } = require("../lib/tmdb.js");
 
@@ -93,11 +93,13 @@ async function findSeriesUrl(url) {
 
 async function findEpisode(pageUrl, season, episode) {
   let url = pageUrl;
-  try {
-    const redirected = await findSeriesUrl(url);
-    if (redirected) url = redirected;
-  } catch (e) {
-    return null;
+  if (!/\/series\/[\s\S]*\/?$/.test(url)) {
+    try {
+      const redirected = await findSeriesUrl(url);
+      if (redirected) url = redirected;
+    } catch (e) {
+      return null;
+    }
   }
   try {
     const html = await fetchText(url, { headers: { Referer: BASE + "/" } });
@@ -144,7 +146,7 @@ function extractLinkFromObfuscatedPage(url, referers) {
   });
 }
 
-async function checkWorkingStreamReferer(streamUrl, originEmbedUrl) {
+async function resolveHlsRefererAndExpand(streamUrl, originEmbedUrl, baseTitle) {
   const iframeHostReferer = (() => {
     try {
       const u = new URL(originEmbedUrl);
@@ -153,16 +155,28 @@ async function checkWorkingStreamReferer(streamUrl, originEmbedUrl) {
       return "https://qesen.net/";
     }
   })();
-  const candidates = [iframeHostReferer, "https://qesen.net/", "https://newaat.com/"];
+  const candidates = [iframeHostReferer, "https://qesen.net/"];
   for (const ref of candidates) {
     try {
-      const res = await fetch(streamUrl, { headers: { Referer: ref, Origin: ref.replace(/\/$/, "") }, skipSizeCheck: true, redirect: "follow" });
-      if (res.status === 200) return ref;
+      const hdr = {
+        Referer: ref,
+        Origin: ref.replace(/\/$/, ""),
+        "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
+        Accept: "*/*"
+      };
+      const text = await fetchText(streamUrl, { headers: hdr });
+      return expandFromMasterText(toStream(metadata.name, baseTitle, streamUrl, "auto", hdr), text);
     } catch (e) {
       continue;
     }
   }
-  return iframeHostReferer;
+  const fallbackHdr = {
+    Referer: iframeHostReferer,
+    Origin: iframeHostReferer.replace(/\/$/, ""),
+    "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
+    Accept: "*/*"
+  };
+  return [toStream(metadata.name, baseTitle, streamUrl, "auto", fallbackHdr)];
 }
 
 async function loadLinks(episodeUrl) {
@@ -222,78 +236,74 @@ async function loadLinks(episodeUrl) {
     }
   }
 
-  for (const item of servers) {
-    const serverType = (item.name || "").toLowerCase().trim();
-    const serverIdRaw = item.id || "";
+  const probed = new Set();
+  const serverResults = await Promise.all(
+    servers.map(async (item) => {
+      const serverType = (item.name || "").toLowerCase().trim();
+      const serverIdRaw = item.id || "";
 
-    let embedUrl = "";
-    switch (serverType) {
-      case "youtube": embedUrl = "https://www.youtube.com/watch?v=" + serverIdRaw; break;
-      case "youtube_in": embedUrl = "https://www.youtube.com/embed/" + serverIdRaw; break;
-      case "express": embedUrl = serverIdRaw; break;
-      case "dailymotion": embedUrl = item.codeHref || serverIdRaw; break;
-      case "facebook": embedUrl = "https://app.videas.fr/embed/media/" + serverIdRaw; break;
-      case "estream": embedUrl = "https://arabveturk.com/embed-" + serverIdRaw + ".html"; break;
-      case "arab hd":
-      case "arabhd":
-      case "arab-hd": embedUrl = "https://v.turkvearab.com/embed-" + serverIdRaw + ".html"; break;
-      case "box": embedUrl = "https://youdboox.com/embed-" + serverIdRaw + ".html"; break;
-      case "now": embedUrl = "https://extreamnow.org/embed-" + serverIdRaw + ".html"; break;
-      case "ok": embedUrl = ensureHttp("//ok.ru/videoembed/" + serverIdRaw); break;
-      case "red hd":
-      case "redhd":
-      case "red-hd": embedUrl = "https://iplayerhls.com/e/" + serverIdRaw; break;
-      case "pro hd":
-      case "prohd":
-      case "pro-hd": embedUrl = "https://ebtv.upns.live/#" + serverIdRaw; break;
-      case "pro": embedUrl = "https://mdna.upns.online/#" + serverIdRaw; break;
-      default: embedUrl = item.codeHref || serverIdRaw;
-    }
-    if (!embedUrl) continue;
+      let embedUrl = "";
+      switch (serverType) {
+        case "youtube": embedUrl = "https://www.youtube.com/watch?v=" + serverIdRaw; break;
+        case "youtube_in": embedUrl = "https://www.youtube.com/embed/" + serverIdRaw; break;
+        case "express": embedUrl = serverIdRaw; break;
+        case "dailymotion": embedUrl = item.codeHref || serverIdRaw; break;
+        case "facebook": embedUrl = "https://app.videas.fr/embed/media/" + serverIdRaw; break;
+        case "estream": embedUrl = "https://arabveturk.com/embed-" + serverIdRaw + ".html"; break;
+        case "arab hd":
+        case "arabhd":
+        case "arab-hd": embedUrl = "https://v.turkvearab.com/embed-" + serverIdRaw + ".html"; break;
+        case "box": embedUrl = "https://youdboox.com/embed-" + serverIdRaw + ".html"; break;
+        case "now": embedUrl = "https://extreamnow.org/embed-" + serverIdRaw + ".html"; break;
+        case "ok": embedUrl = ensureHttp("//ok.ru/videoembed/" + serverIdRaw); break;
+        case "red hd":
+        case "redhd":
+        case "red-hd": embedUrl = "https://iplayerhls.com/e/" + serverIdRaw; break;
+        case "pro hd":
+        case "prohd":
+        case "pro-hd": embedUrl = "https://ebtv.upns.live/#" + serverIdRaw; break;
+        case "pro": embedUrl = "https://mdna.upns.online/#" + serverIdRaw; break;
+        default: embedUrl = item.codeHref || serverIdRaw;
+      }
+      if (!embedUrl) return [];
 
-    if (serverType === "arab hd" || serverType === "arabhd" || serverType === "arab-hd" || serverType === "estream") {
-      try {
-        const extractedM3u8 = await extractLinkFromObfuscatedPage(embedUrl, [mainPageHostReferer, "https://newaat.com/"]);
-        if (!extractedM3u8) continue;
-        const workingReferer = await checkWorkingStreamReferer(extractedM3u8, embedUrl);
-        streams.push(toStream(metadata.name, item.name || serverType, extractedM3u8, "auto", {
-          Referer: workingReferer,
-          Origin: workingReferer.replace(/\/$/, ""),
-          "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
-          Accept: "*/*"
-        }));
-      } catch (e) {
-        continue;
+      if (serverType === "arab hd" || serverType === "arabhd" || serverType === "arab-hd" || serverType === "estream") {
+        try {
+          const extractedM3u8 = await extractLinkFromObfuscatedPage(embedUrl, [mainPageHostReferer, "https://newaat.com/"]);
+          if (!extractedM3u8) return [];
+          probed.add(extractedM3u8);
+          return await resolveHlsRefererAndExpand(extractedM3u8, embedUrl, item.name || serverType);
+        } catch (e) {
+          return [];
+        }
+      } else if (serverType === "youtube" || serverType === "youtube_in") {
+        return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
+      } else if (serverType === "dailymotion") {
+        try {
+          let dmUrl = embedUrl;
+          if (!/^https?:\/\//i.test(dmUrl)) dmUrl = "https://www.dailymotion.com/video/" + dmUrl;
+          return /dailymotion\.com\/video/.test(dmUrl) ? await extractDailymotion(dmUrl, { Referer: "https://www.dailymotion.com/" }) : await extractFromUrl(dmUrl, mainPageHostReferer);
+        } catch (e) {
+          return [];
+        }
+      } else {
+        try {
+          return await extractFromUrl(embedUrl, mainPageHostReferer);
+        } catch (e) {
+          return [];
+        }
       }
-    } else if (serverType === "youtube" || serverType === "youtube_in") {
-      streams.push(toStream(metadata.name, "YouTube", embedUrl, "auto", {}));
-    } else if (serverType === "dailymotion") {
-      try {
-        let dmUrl = embedUrl;
-        if (!/^https?:\/\//i.test(dmUrl)) dmUrl = "https://www.dailymotion.com/video/" + dmUrl;
-        const dStreams = /dailymotion\.com\/video/.test(dmUrl) ? await extractDailymotion(dmUrl, { Referer: "https://www.dailymotion.com/" }) : await extractFromUrl(dmUrl, mainPageHostReferer);
-        for (const s of dStreams) streams.push(s);
-      } catch (e) {
-        continue;
-      }
-    } else {
-      try {
-        const sub = await extractFromUrl(embedUrl, mainPageHostReferer);
-        for (const s of sub) streams.push(s);
-      } catch (e) {
-        continue;
-      }
-    }
-  }
+    })
+  );
+  for (const r of serverResults) for (const s of r) streams.push(s);
 
-  const result = [];
-  for (const s of streams) {
-    if (s.quality === "auto" && /\.m3u8(\?.*)?$/i.test(s.url)) {
-      for (const e of await expandM3u8Qualities(s)) result.push(e);
-    } else {
-      result.push(s);
+  const tasks = streams.map(async (s) => {
+    if (s.quality === "auto" && s.provider !== "Extractor" && /\.m3u8(\?.*)?$/i.test(s.url) && !probed.has(s.url)) {
+      return await expandM3u8Qualities(s);
     }
-  }
+    return [s];
+  });
+  const result = [].concat(...(await Promise.all(tasks)));
   return result;
 }
 
