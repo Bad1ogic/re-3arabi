@@ -200,25 +200,160 @@ function generateIvCandidates(domain, videoId) {
   return candidates;
 }
 
-let _cryptoJs = null;
-try { _cryptoJs = require("crypto-js"); } catch (e) { _cryptoJs = null; }
+// ---- pure-JS AES-128-CBC (AES Rijndael; ported from crypto-js's aes.js so
+//      it is byte-for-byte compatible; no external crypto dependency) ----
+const SP_SBOX = [];
+const SP_INV_SBOX = [];
+const SP_SM0 = [];
+const SP_SM1 = [];
+const SP_SM2 = [];
+const SP_SM3 = [];
+const SP_ISM0 = [];
+const SP_ISM1 = [];
+const SP_ISM2 = [];
+const SP_ISM3 = [];
+(function () {
+  const d = [];
+  for (let i = 0; i < 256; i++) {
+    if (i < 128) d[i] = i << 1;
+    else d[i] = (i << 1) ^ 0x11b;
+  }
+  let x = 0;
+  let xi = 0;
+  for (let i = 0; i < 256; i++) {
+    let sx = xi ^ (xi << 1) ^ (xi << 2) ^ (xi << 3) ^ (xi << 4);
+    sx = (sx >>> 8) ^ (sx & 0xff) ^ 0x63;
+    SP_SBOX[x] = sx;
+    SP_INV_SBOX[sx] = x;
+    const x2 = d[x], x4 = d[x2], x8 = d[x4];
+    let t = (d[sx] * 0x101) ^ (sx * 0x1010100);
+    SP_SM0[x] = (t << 24) | (t >>> 8);
+    SP_SM1[x] = (t << 16) | (t >>> 16);
+    SP_SM2[x] = (t << 8) | (t >>> 24);
+    SP_SM3[x] = t;
+    t = (x8 * 0x1010101) ^ (x4 * 0x10001) ^ (x2 * 0x101) ^ (x * 0x1010100);
+    SP_ISM0[sx] = (t << 24) | (t >>> 8);
+    SP_ISM1[sx] = (t << 16) | (t >>> 16);
+    SP_ISM2[sx] = (t << 8) | (t >>> 24);
+    SP_ISM3[sx] = t;
+    if (!x) {
+      x = xi = 1;
+    } else {
+      x = x2 ^ d[d[d[x8 ^ x2]]];
+      xi ^= d[d[xi]];
+    }
+  }
+}());
+const SP_RCON = [0, 1, 2, 4, 8, 16, 32, 64, 128, 27, 54];
+
+function spExpandKey(keyWords) {
+  const ks = [];
+  let i;
+  let t;
+  for (i = 0; i < 4; i++) ks[i] = keyWords[i];
+  for (; i < 44; i++) {
+    t = ks[i - 1];
+    if (!(i % 4)) {
+      t = (t << 8) | (t >>> 24);
+      t = (SP_SBOX[t >>> 24] << 24) | (SP_SBOX[(t >>> 16) & 0xff] << 16) | (SP_SBOX[(t >>> 8) & 0xff] << 8) | SP_SBOX[t & 0xff];
+      t ^= SP_RCON[(i / 4) | 0] << 24;
+    }
+    ks[i] = ks[i - 4] ^ t;
+  }
+  const inv = [];
+  for (let j = 0; j < 44; j++) {
+    const k = 44 - j;
+    t = (j % 4) ? ks[k] : ks[k - 4];
+    if (j < 4 || k <= 4) inv[j] = t;
+    else inv[j] = SP_ISM0[SP_SBOX[t >>> 24]] ^ SP_ISM1[SP_SBOX[(t >>> 16) & 0xff]] ^ SP_ISM2[SP_SBOX[(t >>> 8) & 0xff]] ^ SP_ISM3[SP_SBOX[t & 0xff]];
+  }
+  return inv;
+}
+
+function spCryptBlock(ik, s0, s1, s2, s3) {
+  s0 ^= ik[0];
+  s1 ^= ik[1];
+  s2 ^= ik[2];
+  s3 ^= ik[3];
+  let ks = 4, t0, t1, t2, t3;
+  for (let rnd = 1; rnd < 10; rnd++) {
+    t0 = SP_ISM0[s0 >>> 24] ^ SP_ISM1[(s1 >>> 16) & 0xff] ^ SP_ISM2[(s2 >>> 8) & 0xff] ^ SP_ISM3[s3 & 0xff] ^ ik[ks++];
+    t1 = SP_ISM0[s1 >>> 24] ^ SP_ISM1[(s2 >>> 16) & 0xff] ^ SP_ISM2[(s3 >>> 8) & 0xff] ^ SP_ISM3[s0 & 0xff] ^ ik[ks++];
+    t2 = SP_ISM0[s2 >>> 24] ^ SP_ISM1[(s3 >>> 16) & 0xff] ^ SP_ISM2[(s0 >>> 8) & 0xff] ^ SP_ISM3[s1 & 0xff] ^ ik[ks++];
+    t3 = SP_ISM0[s3 >>> 24] ^ SP_ISM1[(s0 >>> 16) & 0xff] ^ SP_ISM2[(s1 >>> 8) & 0xff] ^ SP_ISM3[s2 & 0xff] ^ ik[ks++];
+    s0 = t0;
+    s1 = t1;
+    s2 = t2;
+    s3 = t3;
+  }
+  t0 = ((SP_INV_SBOX[s0 >>> 24] << 24) | (SP_INV_SBOX[(s1 >>> 16) & 0xff] << 16) | (SP_INV_SBOX[(s2 >>> 8) & 0xff] << 8) | SP_INV_SBOX[s3 & 0xff]) ^ ik[ks++];
+  t1 = ((SP_INV_SBOX[s1 >>> 24] << 24) | (SP_INV_SBOX[(s2 >>> 16) & 0xff] << 16) | (SP_INV_SBOX[(s3 >>> 8) & 0xff] << 8) | SP_INV_SBOX[s0 & 0xff]) ^ ik[ks++];
+  t2 = ((SP_INV_SBOX[s2 >>> 24] << 24) | (SP_INV_SBOX[(s3 >>> 16) & 0xff] << 16) | (SP_INV_SBOX[(s0 >>> 8) & 0xff] << 8) | SP_INV_SBOX[s1 & 0xff]) ^ ik[ks++];
+  t3 = ((SP_INV_SBOX[s3 >>> 24] << 24) | (SP_INV_SBOX[(s0 >>> 16) & 0xff] << 16) | (SP_INV_SBOX[(s1 >>> 8) & 0xff] << 8) | SP_INV_SBOX[s2 & 0xff]) ^ ik[ks++];
+  return [t0, t1, t2, t3];
+}
+
+function spDecryptBlockWords(w, ik) {
+  const t = w[1];
+  w[1] = w[3];
+  w[3] = t;
+  const r = spCryptBlock(ik, w[0], w[1], w[2], w[3]);
+  return [r[0], r[3], r[2], r[1]];
+}
+
+// keyWords/ivBytes/cipherBytes are byte arrays; matches crypto-js CBC behavior
+function spDecryptCbcBytes(cipherBytes, keyWords, ivBytes) {
+  const ik = spExpandKey(keyWords);
+  const words = [];
+  for (let b = 0; b + 4 <= cipherBytes.length; b += 4) {
+    words.push((cipherBytes[b] << 24) | (cipherBytes[b + 1] << 16) | (cipherBytes[b + 2] << 8) | cipherBytes[b + 3]);
+  }
+  const prev = [0, 0, 0, 0];
+  for (let i = 0; i < 4; i++) prev[i] = (ivBytes[i * 4] << 24) | (ivBytes[i * 4 + 1] << 16) | (ivBytes[i * 4 + 2] << 8) | ivBytes[i * 4 + 3];
+  const out = [];
+  for (let q = 0; q + 4 <= words.length; q += 4) {
+    const block = [words[q], words[q + 1], words[q + 2], words[q + 3]];
+    const dec = spDecryptBlockWords(block, ik);
+    for (let i = 0; i < 4; i++) {
+      const x = dec[i] ^ prev[i];
+      out.push((x >>> 24) & 0xff, (x >>> 16) & 0xff, (x >>> 8) & 0xff, x & 0xff);
+    }
+    prev[0] = words[q];
+    prev[1] = words[q + 1];
+    prev[2] = words[q + 2];
+    prev[3] = words[q + 3];
+  }
+  return out;
+}
 
 function decryptSmartPlayer(hex, iv) {
   try {
-    const CJS = _cryptoJs;
-    if (!CJS) return "";
-    const encrypted = CJS.enc.Hex.parse(padHex(hex));
-    const key = CJS.lib.WordArray.create(SP_KEY_WORDS.slice(), 16);
-    const ivWA = CJS.enc.Utf8.parse(iv);
-    const cfg = { iv: ivWA, mode: CJS.mode.CBC, padding: CJS.pad.Pkcs7 };
-    let decrypted;
-    try {
-      decrypted = CJS.AES.decrypt({ ciphertext: encrypted }, key, cfg);
-    } catch (e) {
-      decrypted = null;
+    const cipherBytes = hexToBytes(hex);
+    if (!cipherBytes.length || cipherBytes.length % 16 !== 0) return "";
+    const keyWords = [SP_KEY_WORDS[0], SP_KEY_WORDS[1], SP_KEY_WORDS[2], SP_KEY_WORDS[3]];
+    const ivBytes = [];
+    for (let i = 0; i < 16; i++) ivBytes.push(iv.charCodeAt(i));
+    const out = spDecryptCbcBytes(cipherBytes, keyWords, ivBytes);
+    const pad = out[out.length - 1];
+    if (!pad || pad < 1 || pad > 16 || pad > out.length) return "";
+    for (let i = out.length - pad; i < out.length; i++) if (out[i] !== pad) return "";
+    let txt = "";
+    const end = out.length - pad;
+    for (let i = 0; i < end; i++) {
+      const b0 = out[i];
+      if (b0 < 0x80) {
+        txt += String.fromCharCode(b0);
+      } else if ((b0 & 0xe0) === 0xc0 && i + 1 < end) {
+        txt += String.fromCharCode(((b0 & 0x1f) << 6) | (out[++i] & 0x3f));
+      } else if ((b0 & 0xf0) === 0xe0 && i + 2 < end) {
+        txt += String.fromCharCode(((b0 & 0x0f) << 12) | ((out[++i] & 0x3f) << 6) | (out[++i] & 0x3f));
+      } else if ((b0 & 0xf8) === 0xf0 && i + 3 < end) {
+        const cp = ((b0 & 0x07) << 18) | ((out[++i] & 0x3f) << 12) | ((out[++i] & 0x3f) << 6) | (out[++i] & 0x3f);
+        txt += String.fromCharCode((cp >> 10) + 0xd800, (cp & 0x3ff) + 0xdc00);
+      } else {
+        txt += String.fromCharCode(b0);
+      }
     }
-    if (!decrypted) return "";
-    const txt = decrypted.toString(CJS.enc.Utf8);
     if (/^\{/.test(txt.trim())) return txt;
     return "";
   } catch (e) {
@@ -362,4 +497,4 @@ async function extractFromUrl(url, referer) {
   }
 }
 
-module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl };
+module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer };

@@ -1,6 +1,6 @@
 /**
  * Aflaam - Built from nuvio/src/providers/aflaam.js
- * Generated: 2026-09-10T19:26:24.300Z
+ * Generated: 2026-09-10T19:57:24.829Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

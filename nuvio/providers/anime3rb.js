@@ -1,6 +1,6 @@
 /**
  * Anime3rb - Built from nuvio/src/providers/anime3rb.js
- * Generated: 2026-09-10T19:26:24.480Z
+ * Generated: 2026-09-10T19:57:25.015Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

@@ -1,6 +1,6 @@
 /**
  * Animerco - Built from nuvio/src/providers/animerco.js
- * Generated: 2026-09-10T19:26:24.506Z
+ * Generated: 2026-09-10T19:57:25.041Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
