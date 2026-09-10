@@ -124,7 +124,13 @@ async function main() {
 
   manifest.sort((a, b) => a.id.localeCompare(b.id));
 
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  const payload = {
+    name: "3rabi Nuvio",
+    version: "1.0.0",
+    scrapers: manifest
+  };
+
+  fs.writeFileSync(manifestPath, JSON.stringify(payload, null, 2) + "\n");
 
   console.log("\nWrote manifest.json with " + manifest.length + " enabled/tracked provider(s)");
   console.log("Done: " + ok + " built, " + failed + " failed/skipped\n");
