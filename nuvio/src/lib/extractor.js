@@ -95,6 +95,10 @@ async function extractDailymotion(url, headers) {
   const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
   if (!idMatch) return [];
   const id = idMatch[1];
+  const playHeaders = Object.assign({}, headers, {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    Accept: "*/*"
+  });
   const streams = [];
   try {
     const videoPageUrl = `https://www.dailymotion.com/video/${id}`;
@@ -117,11 +121,11 @@ async function extractDailymotion(url, headers) {
         const u = entry && entry.url;
         if (!u) continue;
         if (/geo/i.test((entry.type || "") + u)) continue;
-        streams.push(toStream("Dailymotion", "Dailymotion " + (key === "auto" ? "Auto" : key + "p"), u, key === "auto" ? "auto" : key, headers));
+        streams.push(toStream("Dailymotion", "Dailymotion " + (key === "auto" ? "Auto" : key + "p"), u, key === "auto" ? "auto" : key, playHeaders));
       }
     }
-    if (streams.length === 0 && json.stream_hls_url) {
-      streams.push(toStream("Dailymotion", "Dailymotion", json.stream_hls_url, "auto", headers));
+    if (json.stream_hls_url) {
+      streams.push(toStream("Dailymotion", "Dailymotion HLS", json.stream_hls_url, "auto", playHeaders));
     }
   } catch (e) {
     return [];

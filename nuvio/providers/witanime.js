@@ -1,6 +1,6 @@
 /**
  * Witanime - Built from nuvio/src/providers/witanime.js
- * Generated: 2026-09-10T17:45:05.897Z
+ * Generated: 2026-09-10T19:03:32.205Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

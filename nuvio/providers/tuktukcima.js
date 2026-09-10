@@ -1,6 +1,6 @@
 /**
  * Tuktukcima - Built from nuvio/src/providers/tuktukcima.js
- * Generated: 2026-09-10T17:45:05.810Z
+ * Generated: 2026-09-10T19:03:32.122Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

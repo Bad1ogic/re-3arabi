@@ -1,6 +1,6 @@
 /**
  * Cimalight - Built from nuvio/src/providers/cimalight.js
- * Generated: 2026-09-10T17:45:05.574Z
+ * Generated: 2026-09-10T19:03:31.898Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

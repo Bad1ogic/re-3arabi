@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-10T17:45:05.700Z
+ * Generated: 2026-09-10T19:03:32.021Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -157,6 +157,10 @@ var require_extractor = __commonJS({
         const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
         if (!idMatch) return [];
         const id = idMatch[1];
+        const playHeaders = Object.assign({}, headers, {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+          Accept: "*/*"
+        });
         const streams = [];
         try {
           const videoPageUrl = `https://www.dailymotion.com/video/${id}`;
@@ -179,11 +183,11 @@ var require_extractor = __commonJS({
               const u = entry && entry.url;
               if (!u) continue;
               if (/geo/i.test((entry.type || "") + u)) continue;
-              streams.push(toStream2("Dailymotion", "Dailymotion " + (key === "auto" ? "Auto" : key + "p"), u, key === "auto" ? "auto" : key, headers));
+              streams.push(toStream2("Dailymotion", "Dailymotion " + (key === "auto" ? "Auto" : key + "p"), u, key === "auto" ? "auto" : key, playHeaders));
             }
           }
-          if (streams.length === 0 && json.stream_hls_url) {
-            streams.push(toStream2("Dailymotion", "Dailymotion", json.stream_hls_url, "auto", headers));
+          if (json.stream_hls_url) {
+            streams.push(toStream2("Dailymotion", "Dailymotion HLS", json.stream_hls_url, "auto", playHeaders));
           }
         } catch (e) {
           return [];
@@ -780,7 +784,9 @@ function loadLinks(episodeUrl) {
           const workingReferer = yield checkWorkingStreamReferer(extractedM3u8, embedUrl);
           streams.push(toStream(metadata.name, item.name || serverType, extractedM3u8, "auto", {
             Referer: workingReferer,
-            Origin: workingReferer.trimEnd("/")
+            Origin: workingReferer.trimEnd("/"),
+            "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
+            Accept: "*/*"
           }));
         } catch (e) {
           continue;

@@ -1,6 +1,6 @@
 /**
  * Shahidwbas - Built from nuvio/src/providers/shahidwbas.js
- * Generated: 2026-09-10T17:45:05.765Z
+ * Generated: 2026-09-10T19:03:32.081Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

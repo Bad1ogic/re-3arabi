@@ -1,6 +1,6 @@
 /**
  * 3isk - Built from nuvio/src/providers/3isk.js
- * Generated: 2026-09-10T17:45:05.193Z
+ * Generated: 2026-09-10T19:03:31.540Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

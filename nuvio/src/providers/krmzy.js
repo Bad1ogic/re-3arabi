@@ -256,7 +256,9 @@ async function loadLinks(episodeUrl) {
         const workingReferer = await checkWorkingStreamReferer(extractedM3u8, embedUrl);
         streams.push(toStream(metadata.name, item.name || serverType, extractedM3u8, "auto", {
           Referer: workingReferer,
-          Origin: workingReferer.trimEnd("/")
+          Origin: workingReferer.trimEnd("/"),
+          "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
+          Accept: "*/*"
         }));
       } catch (e) {
         continue;

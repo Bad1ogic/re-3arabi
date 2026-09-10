@@ -1,6 +1,6 @@
 /**
  * FullMatchShows - Built from nuvio/src/providers/fullmatchshows.js
- * Generated: 2026-09-10T17:45:05.687Z
+ * Generated: 2026-09-10T19:03:32.010Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

@@ -1,6 +1,6 @@
 /**
  * AnimeWitcher - Built from nuvio/src/providers/animewitcher.js
- * Generated: 2026-09-10T17:45:05.501Z
+ * Generated: 2026-09-10T19:03:31.829Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
