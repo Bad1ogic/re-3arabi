@@ -1,6 +1,6 @@
 /**
  * Akwam - Built from nuvio/src/providers/akwam.js
- * Generated: 2026-09-10T17:06:11.401Z
+ * Generated: 2026-09-10T17:30:13.270Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -77,9 +77,32 @@ var require_http = __commonJS({
 // src/lib/normalize.js
 var require_normalize = __commonJS({
   "src/lib/normalize.js"(exports2, module2) {
+    function isTitleChar(ch) {
+      const code = ch.charCodeAt(0);
+      return ch >= "a" && ch <= "z" || ch >= "0" && ch <= "9" || code >= 192 && code <= 591 || // Latin-1 Supplement..Latin Extended-B
+      code >= 880 && code <= 1423 || // Greek + Armenian
+      code >= 1424 && code <= 1535 || // Hebrew
+      code >= 1536 && code <= 2303 || // Arabic + Arabic Supplement/Extended-A
+      code >= 64285 && code <= 65023 || // Hebrew/Arabic Presentation Forms
+      code >= 7680 && code <= 7935 || // Latin Extended Additional
+      code >= 2304 && code <= 4095 || // Indic + Thai/Lao/Myanmar
+      code >= 12352 && code <= 12543 || // Hiragana + Katakana
+      code >= 19968 && code <= 40959 || // CJK Unified Ideographs
+      code >= 44032 && code <= 55215;
+    }
     function normalizeTitle(value) {
       if (!value) return "";
-      return value.toString().toLowerCase().replace(/[\u064B-\u0652\u0670\u0640]/g, "").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+      const s = value.toString().toLowerCase().replace(/[\u064B-\u0652\u0670\u0640]/g, "");
+      let out = "";
+      for (let i = 0; i < s.length; i++) {
+        const ch = s.charAt(i);
+        if (ch === " " || ch === "	" || ch === "\n" || ch === "\r") {
+          out += " ";
+        } else if (isTitleChar(ch)) {
+          out += ch;
+        }
+      }
+      return out.replace(/\s+/g, " ").trim();
     }
     function tokenize(value) {
       return normalizeTitle(value).split(" ");

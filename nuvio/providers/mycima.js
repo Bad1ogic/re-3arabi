@@ -1,6 +1,6 @@
 /**
  * Mycima - Built from nuvio/src/providers/mycima.js
- * Generated: 2026-09-10T17:06:11.725Z
+ * Generated: 2026-09-10T17:30:13.582Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

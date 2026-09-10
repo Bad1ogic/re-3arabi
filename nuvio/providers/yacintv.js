@@ -1,6 +1,6 @@
 /**
  * Yacintv - Built from nuvio/src/providers/yacintv.js
- * Generated: 2026-09-10T17:06:11.891Z
+ * Generated: 2026-09-10T17:30:13.751Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

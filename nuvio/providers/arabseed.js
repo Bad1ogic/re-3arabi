@@ -1,6 +1,6 @@
 /**
  * Arabseed - Built from nuvio/src/providers/arabseed.js
- * Generated: 2026-09-10T17:06:11.492Z
+ * Generated: 2026-09-10T17:30:13.360Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

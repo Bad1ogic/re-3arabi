@@ -1,6 +1,6 @@
 /**
  * Alooytv - Built from nuvio/src/providers/alooytv.js
- * Generated: 2026-09-10T17:06:11.420Z
+ * Generated: 2026-09-10T17:30:13.288Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
