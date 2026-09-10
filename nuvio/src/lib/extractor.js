@@ -200,9 +200,13 @@ function generateIvCandidates(domain, videoId) {
   return candidates;
 }
 
+let _cryptoJs = null;
+try { _cryptoJs = require("crypto-js"); } catch (e) { _cryptoJs = null; }
+
 function decryptSmartPlayer(hex, iv) {
   try {
-    const CJS = require("crypto-js");
+    const CJS = _cryptoJs;
+    if (!CJS) return "";
     const encrypted = CJS.enc.Hex.parse(padHex(hex));
     const key = CJS.lib.WordArray.create(SP_KEY_WORDS.slice(), 16);
     const ivWA = CJS.enc.Utf8.parse(iv);

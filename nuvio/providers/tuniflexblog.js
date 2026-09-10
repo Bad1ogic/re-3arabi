@@ -1,6 +1,6 @@
 /**
  * TuniflexBlog - Built from nuvio/src/providers/tuniflexblog.js
- * Generated: 2026-09-10T19:03:32.133Z
+ * Generated: 2026-09-10T19:26:24.994Z
  */
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {

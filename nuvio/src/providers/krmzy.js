@@ -154,7 +154,7 @@ async function checkWorkingStreamReferer(streamUrl, originEmbedUrl) {
   const candidates = [iframeHostReferer, "https://qesen.net/", "https://newaat.com/"];
   for (const ref of candidates) {
     try {
-      const res = await fetch(streamUrl, { headers: { Referer: ref, Origin: ref.trimEnd("/") }, skipSizeCheck: true, redirect: "follow" });
+      const res = await fetch(streamUrl, { headers: { Referer: ref, Origin: ref.replace(/\/$/, "") }, skipSizeCheck: true, redirect: "follow" });
       if (res.status === 200) return ref;
     } catch (e) {
       continue;
@@ -256,7 +256,7 @@ async function loadLinks(episodeUrl) {
         const workingReferer = await checkWorkingStreamReferer(extractedM3u8, embedUrl);
         streams.push(toStream(metadata.name, item.name || serverType, extractedM3u8, "auto", {
           Referer: workingReferer,
-          Origin: workingReferer.trimEnd("/"),
+          Origin: workingReferer.replace(/\/$/, ""),
           "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
           Accept: "*/*"
         }));
