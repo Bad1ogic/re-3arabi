@@ -1,30 +1,10 @@
 /**
  * CimaClub - Built from nuvio/src/providers/cimaclub.js
- * Generated: 2026-09-10T19:57:25.105Z
+ * Generated: 2026-09-10T21:42:46.463Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
-var __async = (__this, __arguments, generator) => {
-  return new Promise((resolve, reject) => {
-    var fulfilled = (value) => {
-      try {
-        step(generator.next(value));
-      } catch (e) {
-        reject(e);
-      }
-    };
-    var rejected = (value) => {
-      try {
-        step(generator.throw(value));
-      } catch (e) {
-        reject(e);
-      }
-    };
-    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
-    step((generator = generator.apply(__this, __arguments)).next());
-  });
 };
 
 // src/lib/http.js
@@ -44,25 +24,19 @@ var require_http = __commonJS({
       if (options.body) init.body = options.body;
       return init;
     }
-    function fetchText2(_0) {
-      return __async(this, arguments, function* (url, options = {}) {
-        const res = yield fetch(url, buildInit(options));
-        if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
-        return yield res.text();
-      });
+    async function fetchText2(url, options = {}) {
+      const res = await fetch(url, buildInit(options));
+      if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+      return await res.text();
     }
-    function fetchBuffer(_0) {
-      return __async(this, arguments, function* (url, options = {}) {
-        const res = yield fetch(url, buildInit(options));
-        if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
-        return yield res.arrayBuffer();
-      });
+    async function fetchBuffer(url, options = {}) {
+      const res = await fetch(url, buildInit(options));
+      if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+      return await res.arrayBuffer();
     }
-    function fetchJson(_0) {
-      return __async(this, arguments, function* (url, options = {}) {
-        const raw = yield fetchText2(url, options);
-        return JSON.parse(raw);
-      });
+    async function fetchJson(url, options = {}) {
+      const raw = await fetchText2(url, options);
+      return JSON.parse(raw);
     }
     function absoluteUrl(base, url) {
       if (!url) return "";
@@ -139,57 +113,53 @@ var require_tmdb = __commonJS({
     var { normalizeTitle } = require_normalize();
     var TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
     var TMDB_BASE = "https://api.themoviedb.org/3";
-    function getMedia(tmdbId, mediaType) {
-      return __async(this, null, function* () {
-        const endpoint = mediaType === "tv" ? "tv" : "movie";
-        try {
-          const res = yield fetch(
-            TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
-            { skipSizeCheck: true }
-          );
-          if (!res.ok) return null;
-          const data = yield res.json();
-          if (data && (data.title || data.name)) return data;
-          const resEn = yield fetch(
-            TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
-            { skipSizeCheck: true }
-          );
-          if (!resEn.ok) return null;
-          return yield resEn.json();
-        } catch (e) {
-          console.error("[TMDB] getMedia error:", e.message);
-          return null;
-        }
-      });
+    async function getMedia(tmdbId, mediaType) {
+      const endpoint = mediaType === "tv" ? "tv" : "movie";
+      try {
+        const res = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
+          { skipSizeCheck: true }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data && (data.title || data.name)) return data;
+        const resEn = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
+          { skipSizeCheck: true }
+        );
+        if (!resEn.ok) return null;
+        return await resEn.json();
+      } catch (e) {
+        console.error("[TMDB] getMedia error:", e.message);
+        return null;
+      }
     }
-    function getTitles2(tmdbId, mediaType) {
-      return __async(this, null, function* () {
-        const d = yield getMedia(tmdbId, mediaType);
-        if (!d) return [];
-        const titles = [];
-        const primary = d.title || d.name || "";
-        if (primary) titles.push(primary);
-        const orig = d.original_title || d.original_name || "";
-        if (orig && orig !== primary) titles.push(orig);
-        try {
-          const endpoint = mediaType === "tv" ? "tv" : "movie";
-          const res = yield fetch(
-            TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
-            { skipSizeCheck: true }
-          );
-          if (res.ok) {
-            const alt = yield res.json();
-            const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
-            for (const item of list) {
-              const t = item.title;
-              if (!t) continue;
-              if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
-            }
+    async function getTitles2(tmdbId, mediaType) {
+      const d = await getMedia(tmdbId, mediaType);
+      if (!d) return [];
+      const titles = [];
+      const primary = d.title || d.name || "";
+      if (primary) titles.push(primary);
+      const orig = d.original_title || d.original_name || "";
+      if (orig && orig !== primary) titles.push(orig);
+      try {
+        const endpoint = mediaType === "tv" ? "tv" : "movie";
+        const res = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
+          { skipSizeCheck: true }
+        );
+        if (res.ok) {
+          const alt = await res.json();
+          const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
+          for (const item of list) {
+            const t = item.title;
+            if (!t) continue;
+            if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
           }
-        } catch (e) {
         }
-        return titles;
-      });
+      } catch (e) {
+      }
+      return titles;
     }
     module2.exports = { getMedia, getTitles: getTitles2, TMDB_API_KEY };
   }
@@ -273,48 +243,46 @@ var require_extractor = __commonJS({
     function toStream(providerName, title, url, quality, headers) {
       return { provider: providerName, name: providerName, title: title || providerName, url, quality: quality || "auto", headers: headers || {} };
     }
-    function extractDailymotion(url, headers) {
-      return __async(this, null, function* () {
-        const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
-        if (!idMatch) return [];
-        const id = idMatch[1];
-        const playHeaders = Object.assign({}, headers, {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-          Accept: "*/*"
-        });
-        const streams = [];
-        try {
-          const videoPageUrl = `https://www.dailymotion.com/video/${id}`;
-          const meta = yield fetchText2(
-            `https://www.dailymotion.com/player/metadata/video/${id}?embedder=${encodeURIComponent(videoPageUrl)}&fields=qualities,stream_hls_url`,
-            { headers: { Referer: videoPageUrl + "?syndication=273805", Accept: "application/json" } }
-          );
-          const json = JSON.parse(meta);
-          if (json.error) return [];
-          const qualities = json.qualities || {};
-          const keys = Object.keys(qualities).sort((x, y) => {
-            const nx = parseInt(x, 10) || 0;
-            const ny = parseInt(y, 10) || 0;
-            return ny - nx;
-          });
-          for (const key of keys) {
-            const entries = qualities[key];
-            if (!Array.isArray(entries)) continue;
-            for (const entry of entries) {
-              const u = entry && entry.url;
-              if (!u) continue;
-              if (/geo/i.test((entry.type || "") + u)) continue;
-              streams.push(toStream("Dailymotion", "Dailymotion " + (key === "auto" ? "Auto" : key + "p"), u, key === "auto" ? "auto" : key, playHeaders));
-            }
-          }
-          if (json.stream_hls_url) {
-            streams.push(toStream("Dailymotion", "Dailymotion HLS", json.stream_hls_url, "auto", playHeaders));
-          }
-        } catch (e) {
-          return [];
-        }
-        return streams;
+    async function extractDailymotion(url, headers) {
+      const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
+      if (!idMatch) return [];
+      const id = idMatch[1];
+      const playHeaders = Object.assign({}, headers, {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        Accept: "*/*"
       });
+      const streams = [];
+      try {
+        const videoPageUrl = `https://www.dailymotion.com/video/${id}`;
+        const meta = await fetchText2(
+          `https://www.dailymotion.com/player/metadata/video/${id}?embedder=${encodeURIComponent(videoPageUrl)}&fields=qualities,stream_hls_url`,
+          { headers: { Referer: videoPageUrl + "?syndication=273805", Accept: "application/json" } }
+        );
+        const json = JSON.parse(meta);
+        if (json.error) return [];
+        const qualities = json.qualities || {};
+        const keys = Object.keys(qualities).sort((x, y) => {
+          const nx = parseInt(x, 10) || 0;
+          const ny = parseInt(y, 10) || 0;
+          return ny - nx;
+        });
+        for (const key of keys) {
+          const entries = qualities[key];
+          if (!Array.isArray(entries)) continue;
+          for (const entry of entries) {
+            const u = entry && entry.url;
+            if (!u) continue;
+            if (/geo/i.test((entry.type || "") + u)) continue;
+            streams.push(toStream("Dailymotion", "Dailymotion " + (key === "auto" ? "Auto" : key + "p"), u, key === "auto" ? "auto" : key, playHeaders));
+          }
+        }
+        if (json.stream_hls_url) {
+          streams.push(toStream("Dailymotion", "Dailymotion HLS", json.stream_hls_url, "auto", playHeaders));
+        }
+      } catch (e) {
+        return [];
+      }
+      return streams;
     }
     function padHex(hex) {
       let h = String(hex || "").trim().replace(/"/g, "");
@@ -511,137 +479,129 @@ var require_extractor = __commonJS({
         return "";
       }
     }
-    function extractSmartPlayer(playerUrl, referer) {
-      return __async(this, null, function* () {
-        const streams = [];
-        const norm = playerUrl.startsWith("//") ? "https:" + playerUrl : playerUrl;
-        let domain = "";
-        try {
-          domain = new URL(norm).host;
-        } catch (e) {
-          return streams;
-        }
-        let videoId = "";
-        if (norm.includes("#")) videoId = norm.split("#").pop().split("&")[0];
-        else if (norm.includes("id=")) videoId = norm.split("id=")[1].split("&")[0];
-        if (!videoId) return streams;
-        const apiUrl = `https://${domain}/api/v1/video?id=${videoId}`;
-        const headers = {
-          Referer: `https://${domain}/`,
-          Origin: `https://${domain}`,
-          Accept: "application/json, text/plain, */*"
-        };
-        try {
-          const body = yield fetchText2(apiUrl, { headers });
-          for (const iv of generateIvCandidates(domain, videoId)) {
-            const plain = decryptSmartPlayer(body, iv);
-            if (plain) {
-              let source = "";
-              try {
-                const parsed = JSON.parse(plain);
-                source = parsed.source || "";
-              } catch (e) {
-                source = "";
-              }
-              if (!source) {
-                const m1 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+\.m3u8)/);
-                const m2 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+)/);
-                source = m1 ? m1[1] : m2 ? m2[1] : "";
-                if (source) source = "https://" + source;
-              }
-              if (source) {
-                streams.push(toStream("SmartPlayer", "SmartPlayer", cleanStreamUrl(source), "auto", { Referer: `https://${domain}/` }));
-                return streams;
-              }
+    async function extractSmartPlayer(playerUrl, referer) {
+      const streams = [];
+      const norm = playerUrl.startsWith("//") ? "https:" + playerUrl : playerUrl;
+      let domain = "";
+      try {
+        domain = new URL(norm).host;
+      } catch (e) {
+        return streams;
+      }
+      let videoId = "";
+      if (norm.includes("#")) videoId = norm.split("#").pop().split("&")[0];
+      else if (norm.includes("id=")) videoId = norm.split("id=")[1].split("&")[0];
+      if (!videoId) return streams;
+      const apiUrl = `https://${domain}/api/v1/video?id=${videoId}`;
+      const headers = {
+        Referer: `https://${domain}/`,
+        Origin: `https://${domain}`,
+        Accept: "application/json, text/plain, */*"
+      };
+      try {
+        const body = await fetchText2(apiUrl, { headers });
+        for (const iv of generateIvCandidates(domain, videoId)) {
+          const plain = decryptSmartPlayer(body, iv);
+          if (plain) {
+            let source = "";
+            try {
+              const parsed = JSON.parse(plain);
+              source = parsed.source || "";
+            } catch (e) {
+              source = "";
+            }
+            if (!source) {
+              const m1 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+\.m3u8)/);
+              const m2 = plain.match(/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\/[^\s",\\]+)/);
+              source = m1 ? m1[1] : m2 ? m2[1] : "";
+              if (source) source = "https://" + source;
+            }
+            if (source) {
+              streams.push(toStream("SmartPlayer", "SmartPlayer", cleanStreamUrl(source), "auto", { Referer: `https://${domain}/` }));
+              return streams;
             }
           }
-        } catch (e) {
-          return streams;
         }
+      } catch (e) {
         return streams;
-      });
+      }
+      return streams;
     }
     var IGNORE_URLS = ["google.com/recaptcha", "google.com/ads", "googlesyndication.com", "googletagmanager.com", "doubleclick.net"];
     var FILE_HOSTS = ["nitroflare.com", "bowfile.com", "1fichier.com", "ddownload.com", "mdiaload.com", "1cloudfile.com", "workupload.com", "gofile.io", "krakenfiles.com", "racaty.net", "mega.nz", "mediafire.com"];
     var MAX_IFRAME_EXPANSIONS = 4;
-    function collectIframes(pageUrl, html, referer, depth, visited) {
-      return __async(this, null, function* () {
-        const out = [];
-        if (depth > 3 || visited.has(pageUrl)) return out;
-        visited.add(pageUrl);
-        const iframeRe = /<iframe[^>]*?\ssrc=["']([^"']+)["']/gi;
-        let m;
-        while ((m = iframeRe.exec(html)) !== null) {
-          const src = m[1];
-          if (FILE_HOSTS.some((h) => src.includes(h))) continue;
-          out.push(absoluteUrl(pageUrl, src));
+    async function collectIframes(pageUrl, html, referer, depth, visited) {
+      const out = [];
+      if (depth > 3 || visited.has(pageUrl)) return out;
+      visited.add(pageUrl);
+      const iframeRe = /<iframe[^>]*?\ssrc=["']([^"']+)["']/gi;
+      let m;
+      while ((m = iframeRe.exec(html)) !== null) {
+        const src = m[1];
+        if (FILE_HOSTS.some((h) => src.includes(h))) continue;
+        out.push(absoluteUrl(pageUrl, src));
+      }
+      let expanded = 0;
+      const globs = /* @__PURE__ */ new Set();
+      for (const src of out) {
+        if (globs.has(src)) continue;
+        globs.add(src);
+        if (IGNORE_URLS.some((k) => src.includes(k))) continue;
+        if (expanded >= MAX_IFRAME_EXPANSIONS) break;
+        expanded++;
+        try {
+          const sub = await fetchText2(src, { headers: { Referer: referer } });
+          const inner = await extractStreamsFromText(sub, src, referer, depth + 1, visited);
+          if (inner.length) return inner;
+        } catch (e) {
+          continue;
         }
-        let expanded = 0;
-        const globs = /* @__PURE__ */ new Set();
-        for (const src of out) {
-          if (globs.has(src)) continue;
-          globs.add(src);
-          if (IGNORE_URLS.some((k) => src.includes(k))) continue;
-          if (expanded >= MAX_IFRAME_EXPANSIONS) break;
-          expanded++;
-          try {
-            const sub = yield fetchText2(src, { headers: { Referer: referer } });
-            const inner = yield extractStreamsFromText(sub, src, referer, depth + 1, visited);
-            if (inner.length) return inner;
-          } catch (e) {
-            continue;
-          }
-        }
-        return [];
-      });
+      }
+      return [];
     }
-    function extractStreamsFromText(html, pageUrl, referer, depth, visited) {
-      return __async(this, null, function* () {
-        const out = [];
-        const seen = /* @__PURE__ */ new Set();
-        const pushStream = (s) => {
-          if (!s || !s.url) return;
-          if (seen.has(s.url)) return;
-          seen.add(s.url);
-          out.push(s);
-        };
-        const unpacked = unpackPacked(html);
-        if (unpacked !== html) {
-          for (const media of extractMediaUrls(unpacked)) {
-            pushStream(toStream("Extractor", "Auto", media.url, media.quality, { Referer: referer }));
-          }
-        }
-        for (const media of extractMediaUrls(html)) {
+    async function extractStreamsFromText(html, pageUrl, referer, depth, visited) {
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      const pushStream = (s) => {
+        if (!s || !s.url) return;
+        if (seen.has(s.url)) return;
+        seen.add(s.url);
+        out.push(s);
+      };
+      const unpacked = unpackPacked(html);
+      if (unpacked !== html) {
+        for (const media of extractMediaUrls(unpacked)) {
           pushStream(toStream("Extractor", "Auto", media.url, media.quality, { Referer: referer }));
         }
-        const smartRe = /(["'])(https?:\/\/[^"']*\/api\/v1\/video\?id=[^"']+)\1/gi;
-        let m;
-        while ((m = smartRe.exec(html)) !== null) {
-          for (const s of yield extractSmartPlayer(m[2], referer)) pushStream(s);
-        }
-        const iframeStreams = yield collectIframes(pageUrl, html, referer, depth || 0, visited || /* @__PURE__ */ new Set());
-        for (const s of iframeStreams) pushStream(s);
-        return out;
-      });
+      }
+      for (const media of extractMediaUrls(html)) {
+        pushStream(toStream("Extractor", "Auto", media.url, media.quality, { Referer: referer }));
+      }
+      const smartRe = /(["'])(https?:\/\/[^"']*\/api\/v1\/video\?id=[^"']+)\1/gi;
+      let m;
+      while ((m = smartRe.exec(html)) !== null) {
+        for (const s of await extractSmartPlayer(m[2], referer)) pushStream(s);
+      }
+      const iframeStreams = await collectIframes(pageUrl, html, referer, depth || 0, visited || /* @__PURE__ */ new Set());
+      for (const s of iframeStreams) pushStream(s);
+      return out;
     }
-    function extractFromUrl2(url, referer) {
-      return __async(this, null, function* () {
-        const fixed = String(url).startsWith("//") ? "https:" + url : url;
-        if (FILE_HOSTS.some((h) => fixed.includes(h))) return [];
-        if (DIRECT_VIDEO.test(fixed)) {
-          return [toStream("Extractor", "Direct", fixed, "auto", { Referer: referer })];
-        }
-        if (/(^|\.)dailymotion\.com/.test(fixed) || /dailymotion\.com\/embed/.test(fixed)) {
-          return yield extractDailymotion(fixed, { Referer: referer });
-        }
-        const pageUrl = absoluteUrl(fixed, fixed);
-        try {
-          const html = yield fetchText2(pageUrl, { headers: { Referer: referer } });
-          return yield extractStreamsFromText(html, pageUrl, referer, 0, /* @__PURE__ */ new Set());
-        } catch (e) {
-          return [];
-        }
-      });
+    async function extractFromUrl2(url, referer) {
+      const fixed = String(url).startsWith("//") ? "https:" + url : url;
+      if (FILE_HOSTS.some((h) => fixed.includes(h))) return [];
+      if (DIRECT_VIDEO.test(fixed)) {
+        return [toStream("Extractor", "Direct", fixed, "auto", { Referer: referer })];
+      }
+      if (/(^|\.)dailymotion\.com/.test(fixed) || /dailymotion\.com\/embed/.test(fixed)) {
+        return await extractDailymotion(fixed, { Referer: referer });
+      }
+      const pageUrl = absoluteUrl(fixed, fixed);
+      try {
+        const html = await fetchText2(pageUrl, { headers: { Referer: referer } });
+        return await extractStreamsFromText(html, pageUrl, referer, 0, /* @__PURE__ */ new Set());
+      } catch (e) {
+        return [];
+      }
     }
     module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer };
   }
@@ -675,119 +635,111 @@ function toSearchResult($, el) {
   const isTv = href.includes("/series/") || href.includes("/\u0645\u0633\u0644\u0633\u0644-") || $(el).find(".number").length > 0;
   return { title, url: href, poster, isTv: isTv || href.includes("/series/") };
 }
-function findPage(queryTitles) {
-  return __async(this, null, function* () {
-    for (const t of queryTitles.slice(0, 3)) {
-      try {
-        const html = yield fetchText(BASE + "/?s=" + encodeURIComponent(t).replace(/%20/g, "+"));
-        const $ = cheerio.load(html);
-        const results = [];
-        $("div.BlocksHolder > div.Small--Box").each(function(i, el) {
-          const r = toSearchResult($, el);
-          if (r) results.push(r);
-        });
-        const hit = results.find((r) => matchTitle(r.title, queryTitles));
-        if (hit) return hit;
-      } catch (e) {
-        continue;
-      }
+async function findPage(queryTitles) {
+  for (const t of queryTitles.slice(0, 3)) {
+    try {
+      const html = await fetchText(BASE + "/?s=" + encodeURIComponent(t).replace(/%20/g, "+"));
+      const $ = cheerio.load(html);
+      const results = [];
+      $("div.BlocksHolder > div.Small--Box").each(function(i, el) {
+        const r = toSearchResult($, el);
+        if (r) results.push(r);
+      });
+      const hit = results.find((r) => matchTitle(r.title, queryTitles));
+      if (hit) return hit;
+    } catch (e) {
+      continue;
     }
+  }
+  return null;
+}
+async function fetchEpisodeUrl(pageUrl, season, episode) {
+  let doc;
+  try {
+    doc = cheerio.load(await fetchText(pageUrl, { headers: { Referer: BASE } }));
+  } catch (e) {
     return null;
+  }
+  const seasons = [];
+  doc("section.allseasonss .Small--Box a").each(function(i, el) {
+    const href = doc(el).attr("href");
+    const seasonText = doc(el).find(".epnum span").first().next().text().trim();
+    const seasonNum = parseInt(seasonText, 10);
+    if (href) seasons.push({ url: href, season: isNaN(seasonNum) ? void 0 : seasonNum });
   });
-}
-function fetchEpisodeUrl(pageUrl, season, episode) {
-  return __async(this, null, function* () {
-    let doc;
-    try {
-      doc = cheerio.load(yield fetchText(pageUrl, { headers: { Referer: BASE } }));
-    } catch (e) {
-      return null;
-    }
-    const seasons = [];
-    doc("section.allseasonss .Small--Box a").each(function(i, el) {
-      const href = doc(el).attr("href");
-      const seasonText = doc(el).find(".epnum span").first().next().text().trim();
-      const seasonNum = parseInt(seasonText, 10);
-      if (href) seasons.push({ url: href, season: isNaN(seasonNum) ? void 0 : seasonNum });
+  const parseEps = ($) => {
+    const eps2 = [];
+    $("section.allepcont .row a").each(function(i, el) {
+      const href = $(el).attr("href");
+      const name = $(el).find(".ep-info h2").first().text().trim();
+      const epText = $(el).find(".epnum").first().text().trim();
+      const epNum = parseInt(epText, 10);
+      if (href) eps2.push({ url: href, name, episode: isNaN(epNum) && epText ? parseInt(epText.replace(/\D+/g, ""), 10) : epNum });
     });
-    const parseEps = ($) => {
-      const eps2 = [];
-      $("section.allepcont .row a").each(function(i, el) {
-        const href = $(el).attr("href");
-        const name = $(el).find(".ep-info h2").first().text().trim();
-        const epText = $(el).find(".epnum").first().text().trim();
-        const epNum = parseInt(epText, 10);
-        if (href) eps2.push({ url: href, name, episode: isNaN(epNum) && epText ? parseInt(epText.replace(/\D+/g, ""), 10) : epNum });
-      });
-      return eps2;
-    };
-    if (seasons.length) {
-      const target = seasons.filter((s) => s.season === season);
-      const chosen = target[0] || seasons[0];
-      let seasonDoc = doc;
-      if (chosen.url && chosen.url !== pageUrl) {
-        try {
-          seasonDoc = cheerio.load(yield fetchText(chosen.url, { headers: { Referer: pageUrl } }));
-        } catch (e) {
-          seasonDoc = doc;
-        }
+    return eps2;
+  };
+  if (seasons.length) {
+    const target = seasons.filter((s) => s.season === season);
+    const chosen = target[0] || seasons[0];
+    let seasonDoc = doc;
+    if (chosen.url && chosen.url !== pageUrl) {
+      try {
+        seasonDoc = cheerio.load(await fetchText(chosen.url, { headers: { Referer: pageUrl } }));
+      } catch (e) {
+        seasonDoc = doc;
       }
-      const eps2 = parseEps(seasonDoc);
-      const hit2 = eps2.find((e) => e.episode === episode);
-      return hit2 ? hit2.url : null;
     }
-    const eps = parseEps(doc);
-    const hit = eps.find((e) => e.episode === episode);
-    return hit ? hit.url : null;
-  });
+    const eps2 = parseEps(seasonDoc);
+    const hit2 = eps2.find((e) => e.episode === episode);
+    return hit2 ? hit2.url : null;
+  }
+  const eps = parseEps(doc);
+  const hit = eps.find((e) => e.episode === episode);
+  return hit ? hit.url : null;
 }
-function loadLinks(watchUrl) {
-  return __async(this, null, function* () {
-    const streams = [];
-    const headers = Object.assign({ Referer: watchUrl, "X-Requested-With": "XMLHttpRequest" }, HEADERS);
-    let html;
-    try {
-      const res = yield fetch(watchUrl, {
-        method: "POST",
-        headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded" }, headers),
-        body: "watch=1",
-        skipSizeCheck: true
-      });
-      if (!res.ok) return streams;
-      html = yield res.text();
-    } catch (e) {
-      return streams;
-    }
-    const $ = cheerio.load(html);
-    const embeds = [];
-    $("ul#watch li").each(function(i, el) {
-      const u = $(el).attr("data-watch");
-      if (u) embeds.push(u);
+async function loadLinks(watchUrl) {
+  const streams = [];
+  const headers = Object.assign({ Referer: watchUrl, "X-Requested-With": "XMLHttpRequest" }, HEADERS);
+  let html;
+  try {
+    const res = await fetch(watchUrl, {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded" }, headers),
+      body: "watch=1",
+      skipSizeCheck: true
     });
-    $(".ServersList.Download a").each(function(i, el) {
-      const u = $(el).attr("href");
-      if (u) embeds.push(u);
-    });
-    for (const embed of [...new Set(embeds)]) {
-      const found = yield extractFromUrl(embed, watchUrl);
-      for (const s of found) streams.push(s);
-    }
+    if (!res.ok) return streams;
+    html = await res.text();
+  } catch (e) {
     return streams;
+  }
+  const $ = cheerio.load(html);
+  const embeds = [];
+  $("ul#watch li").each(function(i, el) {
+    const u = $(el).attr("data-watch");
+    if (u) embeds.push(u);
   });
+  $(".ServersList.Download a").each(function(i, el) {
+    const u = $(el).attr("href");
+    if (u) embeds.push(u);
+  });
+  for (const embed of [...new Set(embeds)]) {
+    const found = await extractFromUrl(embed, watchUrl);
+    for (const s of found) streams.push(s);
+  }
+  return streams;
 }
-function getStreams(tmdbId, mediaType, season, episode) {
-  return __async(this, null, function* () {
-    const titles = yield getTitles(tmdbId, mediaType);
-    if (!titles.length) return [];
-    const page = yield findPage(titles);
-    if (!page) return [];
-    if (mediaType === "tv") {
-      const epUrl = yield fetchEpisodeUrl(page.url, season || 1, episode || 1);
-      if (!epUrl) return [];
-      return yield loadLinks(epUrl);
-    }
-    const watchUrl = page.url.replace(/\/+$/, "") + "/watch/";
-    return yield loadLinks(watchUrl);
-  });
+async function getStreams(tmdbId, mediaType, season, episode) {
+  const titles = await getTitles(tmdbId, mediaType);
+  if (!titles.length) return [];
+  const page = await findPage(titles);
+  if (!page) return [];
+  if (mediaType === "tv") {
+    const epUrl = await fetchEpisodeUrl(page.url, season || 1, episode || 1);
+    if (!epUrl) return [];
+    return await loadLinks(epUrl);
+  }
+  const watchUrl = page.url.replace(/\/+$/, "") + "/watch/";
+  return await loadLinks(watchUrl);
 }
 module.exports = { metadata, getStreams, findPage, fetchEpisodeUrl, loadLinks };

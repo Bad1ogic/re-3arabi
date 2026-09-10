@@ -112,7 +112,9 @@ async function findEpisode(pageUrl, season, episode) {
       if (href && !isNaN(num)) eps.push({ url: ensureHttp(href), name: epTitle, episode: num });
     });
     eps.reverse();
-    const hit = eps.find((e) => e.episode === episode);
+    const target = typeof episode === "number" ? episode : parseInt(episode, 10);
+    if (isNaN(target)) return null;
+    const hit = eps.find((e) => e.episode === target);
     return hit || null;
   } catch (e) {
     return null;

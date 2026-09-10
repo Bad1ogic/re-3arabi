@@ -3,7 +3,9 @@
  * Nuvio build script for re-3arabi
  *
  * 1. Bundles every provider in src/providers/<id>.js into providers/<id>.js
- *    (esbuild, CJS, target es2016 so Hermes can run it, cheerio etc. external).
+ *    (esbuild, CJS, target esnext so Nuvio's QuickJS 2025 runs it natively —
+ *    an ES2016 downlevel caused a QuickJS bytecode "stack underflow" bug —
+ *    cheerio etc. external).
  * 2. Reads each provider's exported metadata and programmatically generates
  *    manifest.json.
  *
@@ -67,7 +69,7 @@ async function buildProvider(file, minify, meta) {
       outfile: outFile,
       format: "cjs",
       platform: "neutral",
-      target: "es2016",
+      target: "esnext",
       minify: minify,
       sourcemap: false,
       external: EXTERNAL_MODULES,

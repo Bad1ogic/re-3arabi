@@ -1,30 +1,10 @@
 /**
  * Akwam - Built from nuvio/src/providers/akwam.js
- * Generated: 2026-09-10T19:57:24.973Z
+ * Generated: 2026-09-10T21:42:46.335Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
-var __async = (__this, __arguments, generator) => {
-  return new Promise((resolve, reject) => {
-    var fulfilled = (value) => {
-      try {
-        step(generator.next(value));
-      } catch (e) {
-        reject(e);
-      }
-    };
-    var rejected = (value) => {
-      try {
-        step(generator.throw(value));
-      } catch (e) {
-        reject(e);
-      }
-    };
-    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
-    step((generator = generator.apply(__this, __arguments)).next());
-  });
 };
 
 // src/lib/http.js
@@ -44,25 +24,19 @@ var require_http = __commonJS({
       if (options.body) init.body = options.body;
       return init;
     }
-    function fetchText2(_0) {
-      return __async(this, arguments, function* (url, options = {}) {
-        const res = yield fetch(url, buildInit(options));
-        if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
-        return yield res.text();
-      });
+    async function fetchText2(url, options = {}) {
+      const res = await fetch(url, buildInit(options));
+      if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+      return await res.text();
     }
-    function fetchBuffer(_0) {
-      return __async(this, arguments, function* (url, options = {}) {
-        const res = yield fetch(url, buildInit(options));
-        if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
-        return yield res.arrayBuffer();
-      });
+    async function fetchBuffer(url, options = {}) {
+      const res = await fetch(url, buildInit(options));
+      if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+      return await res.arrayBuffer();
     }
-    function fetchJson(_0) {
-      return __async(this, arguments, function* (url, options = {}) {
-        const raw = yield fetchText2(url, options);
-        return JSON.parse(raw);
-      });
+    async function fetchJson(url, options = {}) {
+      const raw = await fetchText2(url, options);
+      return JSON.parse(raw);
     }
     function absoluteUrl(base, url) {
       if (!url) return "";
@@ -139,57 +113,53 @@ var require_tmdb = __commonJS({
     var { normalizeTitle } = require_normalize();
     var TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
     var TMDB_BASE = "https://api.themoviedb.org/3";
-    function getMedia(tmdbId, mediaType) {
-      return __async(this, null, function* () {
-        const endpoint = mediaType === "tv" ? "tv" : "movie";
-        try {
-          const res = yield fetch(
-            TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
-            { skipSizeCheck: true }
-          );
-          if (!res.ok) return null;
-          const data = yield res.json();
-          if (data && (data.title || data.name)) return data;
-          const resEn = yield fetch(
-            TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
-            { skipSizeCheck: true }
-          );
-          if (!resEn.ok) return null;
-          return yield resEn.json();
-        } catch (e) {
-          console.error("[TMDB] getMedia error:", e.message);
-          return null;
-        }
-      });
+    async function getMedia(tmdbId, mediaType) {
+      const endpoint = mediaType === "tv" ? "tv" : "movie";
+      try {
+        const res = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
+          { skipSizeCheck: true }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data && (data.title || data.name)) return data;
+        const resEn = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
+          { skipSizeCheck: true }
+        );
+        if (!resEn.ok) return null;
+        return await resEn.json();
+      } catch (e) {
+        console.error("[TMDB] getMedia error:", e.message);
+        return null;
+      }
     }
-    function getTitles2(tmdbId, mediaType) {
-      return __async(this, null, function* () {
-        const d = yield getMedia(tmdbId, mediaType);
-        if (!d) return [];
-        const titles = [];
-        const primary = d.title || d.name || "";
-        if (primary) titles.push(primary);
-        const orig = d.original_title || d.original_name || "";
-        if (orig && orig !== primary) titles.push(orig);
-        try {
-          const endpoint = mediaType === "tv" ? "tv" : "movie";
-          const res = yield fetch(
-            TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
-            { skipSizeCheck: true }
-          );
-          if (res.ok) {
-            const alt = yield res.json();
-            const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
-            for (const item of list) {
-              const t = item.title;
-              if (!t) continue;
-              if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
-            }
+    async function getTitles2(tmdbId, mediaType) {
+      const d = await getMedia(tmdbId, mediaType);
+      if (!d) return [];
+      const titles = [];
+      const primary = d.title || d.name || "";
+      if (primary) titles.push(primary);
+      const orig = d.original_title || d.original_name || "";
+      if (orig && orig !== primary) titles.push(orig);
+      try {
+        const endpoint = mediaType === "tv" ? "tv" : "movie";
+        const res = await fetch(
+          TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
+          { skipSizeCheck: true }
+        );
+        if (res.ok) {
+          const alt = await res.json();
+          const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
+          for (const item of list) {
+            const t = item.title;
+            if (!t) continue;
+            if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
           }
-        } catch (e) {
         }
-        return titles;
-      });
+      } catch (e) {
+      }
+      return titles;
     }
     module2.exports = { getMedia, getTitles: getTitles2, TMDB_API_KEY };
   }
@@ -267,129 +237,119 @@ function parseSearch(html) {
   });
   return out;
 }
-function resolveBase() {
-  return __async(this, null, function* () {
-    if (baseResolved) return;
+async function resolveBase() {
+  if (baseResolved) return;
+  try {
+    const res = await fetch(BASE + "/movies", { headers: HEADERS, redirect: "follow", skipSizeCheck: true });
+    if (res.url) {
+      const origin = new URL(res.url).origin;
+      if (origin) BASE = origin;
+    }
+  } catch (e) {
+  }
+  baseResolved = true;
+}
+async function findPage(queryTitles) {
+  await resolveBase();
+  for (const t of queryTitles.slice(0, 3)) {
     try {
-      const res = yield fetch(BASE + "/movies", { headers: HEADERS, redirect: "follow", skipSizeCheck: true });
-      if (res.url) {
-        const origin = new URL(res.url).origin;
-        if (origin) BASE = origin;
-      }
+      const html = await fetchText(BASE + "/search?q=" + encodeURIComponent(t));
+      const results = parseSearch(html);
+      const hit = results.find((r) => r.title && matchTitle(r.title, queryTitles));
+      if (hit) return hit;
     } catch (e) {
+      continue;
     }
-    baseResolved = true;
-  });
+  }
+  return null;
 }
-function findPage(queryTitles) {
-  return __async(this, null, function* () {
-    yield resolveBase();
-    for (const t of queryTitles.slice(0, 3)) {
-      try {
-        const html = yield fetchText(BASE + "/search?q=" + encodeURIComponent(t));
-        const results = parseSearch(html);
-        const hit = results.find((r) => r.title && matchTitle(r.title, queryTitles));
-        if (hit) return hit;
-      } catch (e) {
-        continue;
-      }
-    }
-    return null;
-  });
-}
-function findEpisode(pageUrl, season, episode) {
-  return __async(this, null, function* () {
-    const headers = { Referer: BASE };
-    try {
-      const mainHtml = yield fetchText(pageUrl, { headers });
-      const $main = cheerio.load(mainHtml);
-      const seasons = [];
-      $main("div.widget-body > a.btn[href*='/series/']").each(function(i, el) {
-        const href = $main(el).attr("href");
-        const name = $main(el).text().trim();
-        if (href) seasons.push({ name: name || "\u0645\u0648\u0633\u0645", url: href.startsWith("http") ? href : BASE + href });
-      });
-      const mainHasEpisodes = $main("div#series-episodes div[class*='col-']").length > 0;
-      if (!seasons.length && !mainHasEpisodes) return null;
-      const candidates = seasons.length ? seasons : [{ name: "\u0645\u0648\u0633\u0645", url: pageUrl }];
-      const seasonHit = candidates.map((s) => ({ s, n: getSeasonNumber(s.name) })).filter((x) => x.n > 0).sort((a, b) => Math.abs(a.n - season) - Math.abs(b.n - season))[0];
-      const seasonUrl = seasonHit ? seasonHit.s.url : candidates[0].url;
-      const seasonHtml = yield fetchText(seasonUrl, { headers });
-      const $ = cheerio.load(seasonHtml);
-      let ep = null;
-      const containers = $("div#series-episodes div.col-lg-4, div#series-episodes div.col-md-6");
-      containers.each(function(i, el) {
-        const link = $(el).find("a[href*='/episode/']").first();
-        const href = link.attr("href");
-        const name = (link.find("h2").first().text() || link.text() || "").trim();
-        if (href) {
-          const e = getEpisodeNumber(name);
-          if (e === episode) {
-            ep = { url: href, name };
-            return false;
-          }
+async function findEpisode(pageUrl, season, episode) {
+  const headers = { Referer: BASE };
+  try {
+    const mainHtml = await fetchText(pageUrl, { headers });
+    const $main = cheerio.load(mainHtml);
+    const seasons = [];
+    $main("div.widget-body > a.btn[href*='/series/']").each(function(i, el) {
+      const href = $main(el).attr("href");
+      const name = $main(el).text().trim();
+      if (href) seasons.push({ name: name || "\u0645\u0648\u0633\u0645", url: href.startsWith("http") ? href : BASE + href });
+    });
+    const mainHasEpisodes = $main("div#series-episodes div[class*='col-']").length > 0;
+    if (!seasons.length && !mainHasEpisodes) return null;
+    const candidates = seasons.length ? seasons : [{ name: "\u0645\u0648\u0633\u0645", url: pageUrl }];
+    const seasonHit = candidates.map((s) => ({ s, n: getSeasonNumber(s.name) })).filter((x) => x.n > 0).sort((a, b) => Math.abs(a.n - season) - Math.abs(b.n - season))[0];
+    const seasonUrl = seasonHit ? seasonHit.s.url : candidates[0].url;
+    const seasonHtml = await fetchText(seasonUrl, { headers });
+    const $ = cheerio.load(seasonHtml);
+    let ep = null;
+    const containers = $("div#series-episodes div.col-lg-4, div#series-episodes div.col-md-6");
+    containers.each(function(i, el) {
+      const link = $(el).find("a[href*='/episode/']").first();
+      const href = link.attr("href");
+      const name = (link.find("h2").first().text() || link.text() || "").trim();
+      if (href) {
+        const e = getEpisodeNumber(name);
+        if (e === episode) {
+          ep = { url: href, name };
+          return false;
         }
-      });
-      return ep;
-    } catch (e) {
-      return null;
-    }
-  });
-}
-function loadLinks(url, episodeUrl) {
-  return __async(this, null, function* () {
-    const streams = [];
-    try {
-      const step1 = yield fetchText(url, { headers: { Referer: BASE } });
-      const $1 = cheerio.load(step1);
-      const watchEl = $1("a.link-show").first();
-      const rawWatch = watchEl.attr("abs:href") || watchEl.attr("href") || "";
-      if (!rawWatch) return streams;
-      let watchUrl;
-      try {
-        const u = new URL(rawWatch);
-        watchUrl = BASE.replace(/\/+$/, "") + "/" + u.pathname.replace(/^\/+/, "");
-      } catch (e) {
-        watchUrl = rawWatch;
       }
-      if (!/^https?:/.test(watchUrl)) watchUrl = BASE + "/" + watchUrl.replace(/^\/+/, "");
-      const step2 = yield fetchText(watchUrl, { headers: { Referer: episodeUrl } });
-      const $2 = cheerio.load(step2);
-      const seen = /* @__PURE__ */ new Set();
-      $2("source[src]").each(function(i, el) {
-        let videoUrl = ($2(el).attr("abs:src") || $2(el).attr("src") || "").trim();
-        if (!videoUrl) return;
-        videoUrl = videoUrl.replace(/ /g, "%20").replace("https://", "http://");
-        if (seen.has(videoUrl)) return;
-        seen.add(videoUrl);
-        const quality = ($2(el).attr("size") || $2(el).attr("label") || "direct").trim();
-        streams.push({
-          provider: "Akwam",
-          name: "Akwam",
-          title: "Akwam",
-          url: videoUrl,
-          quality,
-          headers: { Referer: episodeUrl }
-        });
-      });
-    } catch (e) {
-      return streams;
-    }
-    return streams;
-  });
+    });
+    return ep;
+  } catch (e) {
+    return null;
+  }
 }
-function getStreams(tmdbId, mediaType, season, episode) {
-  return __async(this, null, function* () {
-    const titles = yield getTitles(tmdbId, mediaType);
-    if (!titles.length) return [];
-    const page = yield findPage(titles);
-    if (!page) return [];
-    if (mediaType === "tv") {
-      const ep = yield findEpisode(page.url, season || 1, episode || 1);
-      if (!ep) return [];
-      return yield loadLinks(ep.url, ep.url);
+async function loadLinks(url, episodeUrl) {
+  const streams = [];
+  try {
+    const step1 = await fetchText(url, { headers: { Referer: BASE } });
+    const $1 = cheerio.load(step1);
+    const watchEl = $1("a.link-show").first();
+    const rawWatch = watchEl.attr("abs:href") || watchEl.attr("href") || "";
+    if (!rawWatch) return streams;
+    let watchUrl;
+    try {
+      const u = new URL(rawWatch);
+      watchUrl = BASE.replace(/\/+$/, "") + "/" + u.pathname.replace(/^\/+/, "");
+    } catch (e) {
+      watchUrl = rawWatch;
     }
-    return yield loadLinks(page.url, page.url);
-  });
+    if (!/^https?:/.test(watchUrl)) watchUrl = BASE + "/" + watchUrl.replace(/^\/+/, "");
+    const step2 = await fetchText(watchUrl, { headers: { Referer: episodeUrl } });
+    const $2 = cheerio.load(step2);
+    const seen = /* @__PURE__ */ new Set();
+    $2("source[src]").each(function(i, el) {
+      let videoUrl = ($2(el).attr("abs:src") || $2(el).attr("src") || "").trim();
+      if (!videoUrl) return;
+      videoUrl = videoUrl.replace(/ /g, "%20").replace("https://", "http://");
+      if (seen.has(videoUrl)) return;
+      seen.add(videoUrl);
+      const quality = ($2(el).attr("size") || $2(el).attr("label") || "direct").trim();
+      streams.push({
+        provider: "Akwam",
+        name: "Akwam",
+        title: "Akwam",
+        url: videoUrl,
+        quality,
+        headers: { Referer: episodeUrl }
+      });
+    });
+  } catch (e) {
+    return streams;
+  }
+  return streams;
+}
+async function getStreams(tmdbId, mediaType, season, episode) {
+  const titles = await getTitles(tmdbId, mediaType);
+  if (!titles.length) return [];
+  const page = await findPage(titles);
+  if (!page) return [];
+  if (mediaType === "tv") {
+    const ep = await findEpisode(page.url, season || 1, episode || 1);
+    if (!ep) return [];
+    return await loadLinks(ep.url, ep.url);
+  }
+  return await loadLinks(page.url, page.url);
 }
 module.exports = { metadata, getStreams, findPage, findEpisode, loadLinks };
