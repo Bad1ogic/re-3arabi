@@ -402,40 +402,17 @@ class krmzyProvider : MainAPI() {
                     if (streamUrl.isBlank()) continue
 
                     if (type.contains("mpegURL", ignoreCase = true) || streamUrl.contains(".m3u8")) {
-                        val qualityLinks = com.lagradost.cloudstream3.utils.M3u8Helper.generateM3u8(
-                            source = this.name,
-                            streamUrl = streamUrl,
-                            referer = "https://www.dailymotion.com/",
-                            headers = mapOf("Origin" to "https://www.dailymotion.com/")
-                        )
-                        if (qualityLinks.isNotEmpty()) {
-                            emitted = true
-                            qualityLinks.forEach { link ->
-                                callback.invoke(
-                                    newExtractorLink(
-                                        source = link.source,
-                                        name = "Dailymotion - ${link.name}",
-                                        url = link.url
-                                    ) {
-                                        this.referer = link.referer
-                                        this.quality = link.quality
-                                        this.headers = link.headers
-                                    }
+                        emitted = true
+                        callback.invoke(
+                            newExtractorLink(source = this.name, name = "Dailymotion", url = streamUrl) {
+                                this.quality = Qualities.Unknown.value
+                                this.referer = "https://www.dailymotion.com/"
+                                this.headers = mapOf(
+                                    "Origin" to "https://www.dailymotion.com/",
+                                    "Referer" to "https://www.dailymotion.com/"
                                 )
                             }
-                        } else {
-                            emitted = true
-                            callback.invoke(
-                                newExtractorLink(source = this.name, name = "Dailymotion", url = streamUrl) {
-                                    this.quality = Qualities.Unknown.value
-                                    this.referer = "https://www.dailymotion.com/"
-                                    this.headers = mapOf(
-                                        "Origin" to "https://www.dailymotion.com/",
-                                        "Referer" to "https://www.dailymotion.com/"
-                                    )
-                                }
-                            )
-                        }
+                        )
                     } else if (type.contains("mp4", ignoreCase = true)) {
                         emitted = true
                         callback.invoke(
