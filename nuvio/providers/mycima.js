@@ -1,6 +1,6 @@
 /**
  * Mycima - Built from nuvio/src/providers/mycima.js
- * Generated: 2026-09-10T21:42:46.654Z
+ * Generated: 2026-09-10T22:03:19.491Z
  */
 
 // src/providers/mycima.js

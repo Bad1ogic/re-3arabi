@@ -1,6 +1,6 @@
 /**
  * Animerco - Built from nuvio/src/providers/animerco.js
- * Generated: 2026-09-10T21:42:46.400Z
+ * Generated: 2026-09-10T22:03:19.234Z
  */
 
 // src/providers/animerco.js

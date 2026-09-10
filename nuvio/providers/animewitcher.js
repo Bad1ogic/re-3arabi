@@ -1,6 +1,6 @@
 /**
  * AnimeWitcher - Built from nuvio/src/providers/animewitcher.js
- * Generated: 2026-09-10T21:42:46.412Z
+ * Generated: 2026-09-10T22:03:19.246Z
  */
 
 // src/providers/animewitcher.js

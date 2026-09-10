@@ -1,6 +1,6 @@
 const { fetchText, HEADERS, absoluteUrl } = require("../lib/http.js");
 const cheerio = require("cheerio-without-node-native");
-const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl } = require("../lib/extractor.js");
+const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandM3u8Qualities } = require("../lib/extractor.js");
 const { matchTitle } = require("../lib/normalize.js");
 const { getTitles } = require("../lib/tmdb.js");
 
@@ -286,7 +286,15 @@ async function loadLinks(episodeUrl) {
     }
   }
 
-  return streams;
+  const result = [];
+  for (const s of streams) {
+    if (s.quality === "auto" && s.provider !== "Dailymotion" && /\.m3u8(\?.*)?$/i.test(s.url)) {
+      for (const e of await expandM3u8Qualities(s)) result.push(e);
+    } else {
+      result.push(s);
+    }
+  }
+  return result;
 }
 
 async function getStreams(tmdbId, mediaType, season, episode) {

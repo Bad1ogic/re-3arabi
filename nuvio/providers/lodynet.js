@@ -1,6 +1,6 @@
 /**
  * LodyNet - Built from nuvio/src/providers/lodynet.js
- * Generated: 2026-09-10T21:42:46.631Z
+ * Generated: 2026-09-10T22:03:19.468Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -242,6 +242,69 @@ var require_extractor = __commonJS({
     }
     function toStream2(providerName, title, url, quality, headers) {
       return { provider: providerName, name: providerName, title: title || providerName, url, quality: quality || "auto", headers: headers || {} };
+    }
+    function resolveMediaUrl(base, u) {
+      try {
+        return new URL(u, base).href;
+      } catch (e) {
+        return absoluteUrl(base, u);
+      }
+    }
+    function parseMasterPlaylist(text, baseUrl) {
+      const variants = [];
+      let current = null;
+      const lines = String(text).split(/\r?\n/);
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) continue;
+        if (line.startsWith("#EXT-X-STREAM-INF:")) {
+          const attrs = line.slice("#EXT-X-STREAM-INF:".length);
+          let bandwidth = 0;
+          let height = 0;
+          let name = "";
+          const attrRe = /([A-Z0-9-]+)=("([^"]*)"|[^,]*)/g;
+          let m;
+          while ((m = attrRe.exec(attrs)) !== null) {
+            if (m[1] === "BANDWIDTH") bandwidth = parseInt(m[2], 10) || 0;
+            else if (m[1] === "RESOLUTION") {
+              const rm = /(\d+)[xX](\d+)/.exec(m[2] || "");
+              if (rm) height = parseInt(rm[2], 10) || 0;
+            } else if (m[1] === "NAME") name = (m[3] || "").trim();
+          }
+          current = { url: "", height, bandwidth, name };
+        } else if (current && line.charAt(0) !== "#") {
+          const url = resolveMediaUrl(baseUrl, line);
+          if (url) {
+            if (!current.name && current.height) current.name = current.height + "p";
+            variants.push({ url, height: current.height, bandwidth: current.bandwidth, name: current.name });
+          }
+          current = null;
+        }
+      }
+      return variants;
+    }
+    async function expandM3u8Qualities(stream) {
+      if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
+      let text;
+      try {
+        text = await fetchText2(stream.url, { headers: stream.headers || {} });
+      } catch (e) {
+        return [stream];
+      }
+      if (!/^\s*#EXTM3U/.test(text)) return [stream];
+      const variants = parseMasterPlaylist(text, stream.url);
+      if (!variants.length) return [stream];
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const v of variants) {
+        const label = v.name || (v.height ? v.height + "p" : v.bandwidth ? Math.round(v.bandwidth / 1e3) + "kbps" : "auto");
+        const key = v.height ? "h" + v.height : "b" + v.bandwidth;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const quality = v.height ? v.height + "p" : "auto";
+        out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
+      }
+      return out.length > 1 ? out : [stream];
     }
     async function extractDailymotion(url, headers) {
       const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
@@ -603,7 +666,7 @@ var require_extractor = __commonJS({
         return [];
       }
     }
-    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer: extractSmartPlayer2, extractDailymotion, unpackPacked, toStream: toStream2, cleanStreamUrl, decryptSmartPlayer };
+    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer: extractSmartPlayer2, extractDailymotion, unpackPacked, toStream: toStream2, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities };
   }
 });
 
