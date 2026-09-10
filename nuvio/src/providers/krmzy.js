@@ -288,7 +288,7 @@ async function loadLinks(episodeUrl) {
 
   const result = [];
   for (const s of streams) {
-    if (s.quality === "auto" && s.provider !== "Dailymotion" && /\.m3u8(\?.*)?$/i.test(s.url)) {
+    if (s.quality === "auto" && /\.m3u8(\?.*)?$/i.test(s.url)) {
       for (const e of await expandM3u8Qualities(s)) result.push(e);
     } else {
       result.push(s);

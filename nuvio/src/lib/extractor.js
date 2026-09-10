@@ -111,6 +111,7 @@ function parseMasterPlaylist(text, baseUrl) {
       let bandwidth = 0;
       let height = 0;
       let name = "";
+      let codecs = "";
       const attrRe = /([A-Z0-9-]+)=("([^"]*)"|[^,]*)/g;
       let m;
       while ((m = attrRe.exec(attrs)) !== null) {
@@ -119,13 +120,14 @@ function parseMasterPlaylist(text, baseUrl) {
           const rm = /(\d+)[xX](\d+)/.exec(m[2] || "");
           if (rm) height = parseInt(rm[2], 10) || 0;
         } else if (m[1] === "NAME") name = (m[3] || "").trim();
+        else if (m[1] === "CODECS") codecs = (m[3] || "").trim();
       }
-      current = { url: "", height, bandwidth, name };
+      current = { url: "", height, bandwidth, name, codecs };
     } else if (current && line.charAt(0) !== "#") {
       const url = resolveMediaUrl(baseUrl, line);
       if (url) {
         if (!current.name && current.height) current.name = current.height + "p";
-        variants.push({ url, height: current.height, bandwidth: current.bandwidth, name: current.name });
+        variants.push({ url, height: current.height, bandwidth: current.bandwidth, name: current.name, codecs: current.codecs });
       }
       current = null;
     }
@@ -144,14 +146,27 @@ async function expandM3u8Qualities(stream) {
   if (!/^\s*#EXTM3U/.test(text)) return [stream];
   const variants = parseMasterPlaylist(text, stream.url);
   if (!variants.length) return [stream];
+
+  const codecShort = (c) => {
+    const s = String(c || "").toLowerCase();
+    if (s.includes("av01") || s.includes("av1")) return "AV1";
+    if (s.includes("avc1") || s.includes("avc") || s.includes("h264")) return "AVC";
+    if (s.includes("hvc1") || s.includes("hev1") || s.includes("hevc")) return "HEVC";
+    if (s.includes("vp9")) return "VP9";
+    return "";
+  };
+
+  const ordered = variants.slice().sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
   const out = [];
   const seen = new Set();
-  for (const v of variants) {
-    const label = v.name || (v.height ? v.height + "p" : v.bandwidth ? Math.round(v.bandwidth / 1000) + "kbps" : "auto");
-    const key = v.height ? "h" + v.height : "b" + v.bandwidth;
+  for (const v of ordered) {
+    const code = codecShort(v.codecs);
+    const base = v.name || (v.height ? v.height + "p" : v.bandwidth ? Math.round(v.bandwidth / 1000) + "kbps" : "auto");
+    const label = code ? base + " " + code : base;
+    const key = (v.height ? "h" + v.height : "b" + v.bandwidth) + "_" + (code || "u");
     if (seen.has(key)) continue;
     seen.add(key);
-    const quality = v.height ? v.height + "p" : "auto";
+    const quality = /^\d+$/.test(v.name || "") ? v.name : v.height ? v.height + "p" : "auto";
     out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
   }
   return out.length > 1 ? out : [stream];
@@ -163,7 +178,7 @@ async function extractDailymotion(url, headers) {
   const id = idMatch[1];
   const playHeaders = Object.assign({}, headers, {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-    Accept: "*/*"
+    Accept: "application/vnd.apple.mpegurl,application/x-mpegURL;q=0.9,*/*;q=0.8"
   });
   const streams = [];
   try {

@@ -1,6 +1,6 @@
 /**
  * Arabseed - Built from nuvio/src/providers/arabseed.js
- * Generated: 2026-09-10T22:03:19.258Z
+ * Generated: 2026-09-10T22:12:38.648Z
  */
 
 // src/providers/arabseed.js

@@ -1,6 +1,6 @@
 /**
  * YouTube - Built from nuvio/src/providers/youtube.js
- * Generated: 2026-09-10T22:03:19.679Z
+ * Generated: 2026-09-10T22:12:39.074Z
  */
 
 // src/providers/youtube.js
