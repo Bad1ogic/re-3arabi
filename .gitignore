@@ -1,0 +1,12 @@
+# Gradle / Android
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# Nuvio
+nuvio/node_modules/

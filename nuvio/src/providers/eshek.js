@@ -1,0 +1,19 @@
+const metadata = {
+  id: "eshek",
+  name: "Eshek",
+  description: "",
+  version: "1.0.0",
+  author: "Abodabodd",
+  supportedTypes: ["tv", "movie"],
+  logo: "https://gesseh.net/wp-content/uploads/2024/10/keesatlogo.png",
+  contentLanguage: ["ar"],
+  formats: ["m3u8", "mp4"],
+  limited: true
+};
+
+async function getStreams(tmdbId, mediaType, season, episode) {
+  // TODO: port Eshek scraping logic to Nuvio
+  return [];
+}
+
+module.exports = { metadata, getStreams };

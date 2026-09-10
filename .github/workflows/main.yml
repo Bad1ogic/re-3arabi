@@ -157,6 +157,22 @@ jobs:
           cp build/plugins.json $GITHUB_WORKSPACE/builds/plugins.json || echo "No plugins.json found in build"
           find . -type f -name "*.cs3" -exec cp {} $GITHUB_WORKSPACE/builds/ \; || echo "No .cs3 files found"
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "src/nuvio/package-lock.json"
+
+      - name: Build Nuvio Plugins
+        working-directory: "src/nuvio"
+        run: |
+          npm ci
+          npm run build
+          mkdir -p $GITHUB_WORKSPACE/builds/nuvio
+          cp providers/*.js $GITHUB_WORKSPACE/builds/nuvio/ || true
+          cp manifest.json $GITHUB_WORKSPACE/builds/nuvio/manifest.json || true
+
       - name: Push updated files back to source branch
         working-directory: "src"
         run: |

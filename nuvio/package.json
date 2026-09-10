@@ -1,0 +1,16 @@
+{
+  "name": "re-3arabi-nuvio",
+  "version": "1.0.0",
+  "description": "Nuvio JavaScript providers ported from the re-3arabi CloudStream repository (Bad1ogic/re-3arabi)",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "build:minify": "node build.js --minify"
+  },
+  "devDependencies": {
+    "cheerio-without-node-native": "^0.20.2",
+    "crypto-js": "^4.2.0",
+    "esbuild": "^0.25.0"
+  },
+  "license": "GPL-3.0"
+}

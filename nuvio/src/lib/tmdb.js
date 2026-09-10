@@ -1,0 +1,58 @@
+const { normalizeTitle } = require("./normalize.js");
+
+// Public TMDB v3 API key (community key, used by several Nuvio provider repos)
+const TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
+const TMDB_BASE = "https://api.themoviedb.org/3";
+
+async function getMedia(tmdbId, mediaType) {
+  const endpoint = mediaType === "tv" ? "tv" : "movie";
+  try {
+    const res = await fetch(
+      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=ar",
+      { skipSizeCheck: true }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && (data.title || data.name)) return data;
+    const resEn = await fetch(
+      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
+      { skipSizeCheck: true }
+    );
+    if (!resEn.ok) return null;
+    return await resEn.json();
+  } catch (e) {
+    console.error("[TMDB] getMedia error:", e.message);
+    return null;
+  }
+}
+
+async function getTitles(tmdbId, mediaType) {
+  const d = await getMedia(tmdbId, mediaType);
+  if (!d) return [];
+  const titles = [];
+  const primary = d.title || d.name || "";
+  if (primary) titles.push(primary);
+  const orig = d.original_title || d.original_name || "";
+  if (orig && orig !== primary) titles.push(orig);
+  try {
+    const endpoint = mediaType === "tv" ? "tv" : "movie";
+    const res = await fetch(
+      TMDB_BASE + "/" + endpoint + "/" + tmdbId + "/alternative_titles?api_key=" + TMDB_API_KEY,
+      { skipSizeCheck: true }
+    );
+    if (res.ok) {
+      const alt = await res.json();
+      const list = endpoint === "tv" ? alt.results || [] : alt.titles || [];
+      for (const item of list) {
+        const t = item.title;
+        if (!t) continue;
+        if (!titles.some((x) => normalizeTitle(x) === normalizeTitle(t))) titles.push(t);
+      }
+    }
+  } catch (e) {
+    // ignore alternative titles errors
+  }
+  return titles;
+}
+
+module.exports = { getMedia, getTitles, TMDB_API_KEY };
