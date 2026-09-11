@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-11T16:57:40.363Z
+ * Generated: 2026-09-11T21:15:43.522Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -832,6 +832,50 @@ async function findPage(queryTitles) {
   }
   return null;
 }
+function seriesSlug(title) {
+  const t = String(title || "").trim().replace(/\s+/g, " ");
+  if (!t) return "";
+  return encodeURIComponent(t.replace(/ /g, "-")).toLowerCase();
+}
+async function tryDirectSeries(title, queryTitles) {
+  const slug = seriesSlug(title);
+  if (!slug) return null;
+  const url = BASE + "/series/" + slug + "/";
+  try {
+    const html = await fetchText(url, { headers: { Referer: BASE + "/" } });
+    if (!html || html.length < 1500) return null;
+    const $ = cheerio.load(html);
+    const h1 = $("h1").first().text().trim();
+    if (!h1 || $("article.postEp").length === 0) return null;
+    if (!matchTitle(h1, queryTitles)) return null;
+    const img = $("div.singleSeries div.info img, div.singleSeries img, .imgSer, .imgBg").first();
+    let poster = img.attr("src") || img.attr("data-src") || "";
+    if (!poster) {
+      const style = img.attr("style") || "";
+      const m = style.match(/url\(['"]?([^'")]+)/);
+      if (m) poster = m[1];
+    }
+    return { title: h1, url, poster: poster ? ensureHttp(poster) : "", isTv: true };
+  } catch (e) {
+    return null;
+  }
+}
+async function resolveSeriesPage(queryTitles) {
+  const fromSearch = await findPage(queryTitles);
+  if (fromSearch) return fromSearch;
+  const top = (queryTitles || []).slice(0, 3);
+  const tried = /* @__PURE__ */ new Set();
+  for (const t of top) {
+    for (const cand of ["\u0645\u0633\u0644\u0633\u0644 " + t, t]) {
+      const slug = seriesSlug(cand);
+      if (!slug || tried.has(slug)) continue;
+      tried.add(slug);
+      const page = await tryDirectSeries(cand, queryTitles);
+      if (page) return page;
+    }
+  }
+  return null;
+}
 async function findSeriesUrl(url) {
   const html = await fetchText(url, { headers: { Referer: BASE + "/" } });
   const $ = cheerio.load(html);
@@ -1100,7 +1144,7 @@ async function loadLinks(episodeUrl) {
 async function getStreams(tmdbId, mediaType, season, episode) {
   try {
     const queryTitles = await getTitles(tmdbId, mediaType);
-    const page = await findPage(queryTitles);
+    const page = await resolveSeriesPage(queryTitles);
     if (!page) return [];
     if (mediaType === "movie") return [];
     const ep = await findEpisode(page.url, season || 1, episode || 1);
@@ -1110,4 +1154,4 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     return [];
   }
 }
-module.exports = { metadata, getStreams, findPage, findEpisode, loadLinks };
+module.exports = { metadata, getStreams, findPage, resolveSeriesPage, tryDirectSeries, findEpisode, loadLinks };
