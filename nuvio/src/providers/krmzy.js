@@ -7,7 +7,7 @@ const { getTitles } = require("../lib/tmdb.js");
 const metadata = {
   id: "krmzy",
   name: "Krmzy",
-  description: "البحث لا يعمل حاليا مشكلة من الموقع",
+  description: "مسلسلات - قرمزي",
   version: "1.0.0",
   author: "Abodabodd",
   supportedTypes: ["tv"],
@@ -18,6 +18,75 @@ const metadata = {
 };
 
 const BASE = "https://krmzy.com";
+
+// Foreign-origin shows whose TMDB title has no Arabic equivalent (the site
+// lists them under their Arabic title only). Map a Latin-normalized pattern in
+// the TMDB title -> the Arabic title krmzy uses. Add a line per such show.
+const TITLE_ALIASES = [
+  { match: /karaday/, arabic: "القبضاي" },
+  { match: /eskiya|edho|hukumdar/, arabic: "قطاع الطرق" }
+];
+
+// Lowercase + fold common Turkish diacritics to ASCII so alias patterns match
+// titles like "Eşkıya" / "Hükümdar" regardless of diacritic form.
+function normalizeLatin(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/ş/g, "s")
+    .replace(/ı/g, "i")
+    .replace(/ü/g, "u")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/ğ/g, "g")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasArabic(s) {
+  return /[\u0600-\u06FF]/.test(String(s || ""));
+}
+
+function titleAliases(queryTitles) {
+  const out = [];
+  const seen = new Set();
+  for (const t of queryTitles || []) {
+    const norm = normalizeLatin(t);
+    if (!norm) continue;
+    for (const a of TITLE_ALIASES) {
+      if (a.match.test(norm) && !seen.has(a.arabic)) {
+        seen.add(a.arabic);
+        out.push(a.arabic);
+      }
+    }
+  }
+  return out;
+}
+
+// Ordered, de-duplicated search queries. Aliases (Arabic, precise) come first,
+// then each TMDB title full, then front prefixes (2-3 words) for Arabic titles
+// so extra trailing words in a TMDB title don't break the site's AND search.
+function buildSearchCandidates(queryTitles, aliases) {
+  const cands = [];
+  const seen = new Set();
+  const push = (c) => {
+    const key = String(c || "").trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    cands.push(key);
+  };
+  for (const a of aliases || []) push(a);
+  for (const t of queryTitles || []) {
+    push(t);
+    if (hasArabic(t)) {
+      const words = String(t).trim().split(/\s+/).filter(Boolean);
+      if (words.length > 2) {
+        push(words.slice(0, Math.min(3, words.length)).join(" "));
+        push(words.slice(0, 2).join(" "));
+      }
+    }
+  }
+  return cands;
+}
 
 function ensureHttp(u) {
   if (!u) return u;
@@ -70,11 +139,15 @@ async function searchSite(query) {
 }
 
 async function findPage(queryTitles) {
-  for (const q of queryTitles) {
+  const qts = (queryTitles || []).filter(Boolean);
+  const aliases = titleAliases(qts);
+  // A site result is valid if it matches any TMDB title OR a known alias.
+  const matchTitles = [...new Set([...qts, ...aliases])];
+  for (const q of buildSearchCandidates(qts, aliases)) {
     try {
       const results = await searchSite(q);
       for (const r of results) {
-        if (matchTitle(r.title, queryTitles)) return r;
+        if (matchTitle(r.title, matchTitles)) return r;
       }
     } catch (e) {
       continue;
@@ -114,20 +187,23 @@ async function tryDirectSeries(title, queryTitles) {
 }
 
 async function resolveSeriesPage(queryTitles) {
-  // Fast/fuzzy path: the site search (?s=). One fetch per title until a match.
-  const fromSearch = await findPage(queryTitles);
+  const qts = (queryTitles || []).filter(Boolean);
+  const aliases = titleAliases(qts);
+  const matchTitles = [...new Set([...qts, ...aliases])];
+  // Fast/fuzzy path: the site search (?s=) over robust candidates.
+  const fromSearch = await findPage(qts);
   if (fromSearch) return fromSearch;
   // Robust path: deterministic direct series URLs. krmzy slugs are
   // "مسلسل <name>" (or just "<name>") with spaces as hyphens. This resolves shows
   // that exist on the site but are missing from (or not yet in) the search index.
-  const top = (queryTitles || []).slice(0, 3);
+  const top = [...new Set([...aliases, ...qts.slice(0, 3)])];
   const tried = new Set();
   for (const t of top) {
     for (const cand of ["مسلسل " + t, t]) {
       const slug = seriesSlug(cand);
       if (!slug || tried.has(slug)) continue;
       tried.add(slug);
-      const page = await tryDirectSeries(cand, queryTitles);
+      const page = await tryDirectSeries(cand, matchTitles);
       if (page) return page;
     }
   }
@@ -160,8 +236,14 @@ async function findEpisode(pageUrl, season, episode) {
       const link = $(el).find("a").first();
       const href = link.attr("href");
       const epTitle = $(el).find("div.title").first().text().trim() || link.text().trim();
-      const numText = $(el).find("div.episodeNum span:last-child").first().text().trim();
-      const num = parseInt(numText, 10);
+      // Episode number is the numeric span inside div.episodeNum (the other
+      // span holds a label like "حلقة"). Pick the numeric one so it works
+      // regardless of span order or :last-child support in the host runtime.
+      let num = NaN;
+      $(el).find("div.episodeNum span").each(function (i, sEl) {
+        const n = parseInt($(sEl).text().trim(), 10);
+        if (!isNaN(n)) num = n;
+      });
       if (href && !isNaN(num)) eps.push({ url: ensureHttp(href), name: epTitle, episode: num });
     });
     eps.reverse();
@@ -402,4 +484,15 @@ async function getStreams(tmdbId, mediaType, season, episode) {
   }
 }
 
-module.exports = { metadata, getStreams, findPage, resolveSeriesPage, tryDirectSeries, findEpisode, loadLinks };
+module.exports = {
+  metadata,
+  getStreams,
+  findPage,
+  resolveSeriesPage,
+  tryDirectSeries,
+  searchSite,
+  titleAliases,
+  buildSearchCandidates,
+  findEpisode,
+  loadLinks
+};

@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-11T21:15:43.522Z
+ * Generated: 2026-09-11T22:06:38.019Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -763,7 +763,7 @@ var { getTitles } = require_tmdb();
 var metadata = {
   id: "krmzy",
   name: "Krmzy",
-  description: "\u0627\u0644\u0628\u062D\u062B \u0644\u0627 \u064A\u0639\u0645\u0644 \u062D\u0627\u0644\u064A\u0627 \u0645\u0634\u0643\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0648\u0642\u0639",
+  description: "\u0645\u0633\u0644\u0633\u0644\u0627\u062A - \u0642\u0631\u0645\u0632\u064A",
   version: "1.0.0",
   author: "Abodabodd",
   supportedTypes: ["tv"],
@@ -773,6 +773,53 @@ var metadata = {
   limited: true
 };
 var BASE = "https://krmzy.com";
+var TITLE_ALIASES = [
+  { match: /karaday/, arabic: "\u0627\u0644\u0642\u0628\u0636\u0627\u064A" },
+  { match: /eskiya|edho|hukumdar/, arabic: "\u0642\u0637\u0627\u0639 \u0627\u0644\u0637\u0631\u0642" }
+];
+function normalizeLatin(s) {
+  return String(s || "").toLowerCase().replace(/ş/g, "s").replace(/ı/g, "i").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").replace(/ğ/g, "g").replace(/\s+/g, " ").trim();
+}
+function hasArabic(s) {
+  return /[\u0600-\u06FF]/.test(String(s || ""));
+}
+function titleAliases(queryTitles) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const t of queryTitles || []) {
+    const norm = normalizeLatin(t);
+    if (!norm) continue;
+    for (const a of TITLE_ALIASES) {
+      if (a.match.test(norm) && !seen.has(a.arabic)) {
+        seen.add(a.arabic);
+        out.push(a.arabic);
+      }
+    }
+  }
+  return out;
+}
+function buildSearchCandidates(queryTitles, aliases) {
+  const cands = [];
+  const seen = /* @__PURE__ */ new Set();
+  const push = (c) => {
+    const key = String(c || "").trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    cands.push(key);
+  };
+  for (const a of aliases || []) push(a);
+  for (const t of queryTitles || []) {
+    push(t);
+    if (hasArabic(t)) {
+      const words = String(t).trim().split(/\s+/).filter(Boolean);
+      if (words.length > 2) {
+        push(words.slice(0, Math.min(3, words.length)).join(" "));
+        push(words.slice(0, 2).join(" "));
+      }
+    }
+  }
+  return cands;
+}
 function ensureHttp(u) {
   if (!u) return u;
   if (u.startsWith("//")) return "https:" + u;
@@ -820,11 +867,14 @@ async function searchSite(query) {
   return items;
 }
 async function findPage(queryTitles) {
-  for (const q of queryTitles) {
+  const qts = (queryTitles || []).filter(Boolean);
+  const aliases = titleAliases(qts);
+  const matchTitles = [.../* @__PURE__ */ new Set([...qts, ...aliases])];
+  for (const q of buildSearchCandidates(qts, aliases)) {
     try {
       const results = await searchSite(q);
       for (const r of results) {
-        if (matchTitle(r.title, queryTitles)) return r;
+        if (matchTitle(r.title, matchTitles)) return r;
       }
     } catch (e) {
       continue;
@@ -861,16 +911,19 @@ async function tryDirectSeries(title, queryTitles) {
   }
 }
 async function resolveSeriesPage(queryTitles) {
-  const fromSearch = await findPage(queryTitles);
+  const qts = (queryTitles || []).filter(Boolean);
+  const aliases = titleAliases(qts);
+  const matchTitles = [.../* @__PURE__ */ new Set([...qts, ...aliases])];
+  const fromSearch = await findPage(qts);
   if (fromSearch) return fromSearch;
-  const top = (queryTitles || []).slice(0, 3);
+  const top = [.../* @__PURE__ */ new Set([...aliases, ...qts.slice(0, 3)])];
   const tried = /* @__PURE__ */ new Set();
   for (const t of top) {
     for (const cand of ["\u0645\u0633\u0644\u0633\u0644 " + t, t]) {
       const slug = seriesSlug(cand);
       if (!slug || tried.has(slug)) continue;
       tried.add(slug);
-      const page = await tryDirectSeries(cand, queryTitles);
+      const page = await tryDirectSeries(cand, matchTitles);
       if (page) return page;
     }
   }
@@ -901,8 +954,11 @@ async function findEpisode(pageUrl, season, episode) {
       const link = $(el).find("a").first();
       const href = link.attr("href");
       const epTitle = $(el).find("div.title").first().text().trim() || link.text().trim();
-      const numText = $(el).find("div.episodeNum span:last-child").first().text().trim();
-      const num = parseInt(numText, 10);
+      let num = NaN;
+      $(el).find("div.episodeNum span").each(function(i2, sEl) {
+        const n = parseInt($(sEl).text().trim(), 10);
+        if (!isNaN(n)) num = n;
+      });
       if (href && !isNaN(num)) eps.push({ url: ensureHttp(href), name: epTitle, episode: num });
     });
     eps.reverse();
@@ -1154,4 +1210,15 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     return [];
   }
 }
-module.exports = { metadata, getStreams, findPage, resolveSeriesPage, tryDirectSeries, findEpisode, loadLinks };
+module.exports = {
+  metadata,
+  getStreams,
+  findPage,
+  resolveSeriesPage,
+  tryDirectSeries,
+  searchSite,
+  titleAliases,
+  buildSearchCandidates,
+  findEpisode,
+  loadLinks
+};
