@@ -1,6 +1,6 @@
 /**
  * 3isk - Built from nuvio/src/providers/3isk.js
- * Generated: 2026-09-11T15:50:55.995Z
+ * Generated: 2026-09-11T16:15:57.412Z
  */
 
 // src/providers/3isk.js

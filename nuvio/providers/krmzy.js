@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-11T15:50:56.538Z
+ * Generated: 2026-09-11T16:15:57.940Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -226,6 +226,49 @@ var require_extractor = __commonJS({
         return [stream];
       }
       return expandFromMasterText2(stream, text);
+    }
+    var B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    function base64Encode(input) {
+      const bytes = [];
+      const s = String(input);
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        bytes.push(c & 255);
+      }
+      let out = "";
+      for (let i = 0; i < bytes.length; i += 3) {
+        const b0 = bytes[i];
+        const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+        const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+        out += B64_CHARS[b0 >> 2];
+        out += B64_CHARS[(b0 & 3) << 4 | b1 >> 4];
+        out += i + 1 < bytes.length ? B64_CHARS[(b1 & 15) << 2 | b2 >> 6] : "=";
+        out += i + 2 < bytes.length ? B64_CHARS[b2 & 63] : "=";
+      }
+      return out;
+    }
+    async function extractMailRuPublic2(url, headers) {
+      const idMatch = String(url).match(/cloud\.mail\.ru\/public\/([A-Za-z0-9/_-]+)\/?$/) || String(url).match(/cloud\.mail\.ru\/public\/([A-Za-z0-9/_-]+)\/?\?/);
+      if (!idMatch) return [];
+      const id = String(idMatch[1]).replace(/\/+$/, "");
+      const hdr = { Referer: "https://cloud.mail.ru/" };
+      try {
+        const page = await fetchText2("https://cloud.mail.ru/public/" + id, { headers: hdr });
+        const m = /"videowl_view":\{"count":"\d+","url":"([^"]+)"/.exec(page);
+        const idToken = m ? m[1] : null;
+        if (!idToken) return [];
+        const masterUrl = idToken + "/0p/" + base64Encode(id) + ".m3u8?double_encode=1";
+        let text;
+        try {
+          text = await fetchText2(masterUrl, { headers: hdr });
+        } catch (e) {
+          text = "";
+        }
+        if (!/^\s*#EXTM3U/.test(text || "")) return [];
+        return expandFromMasterText2(toStream2("MailRu", "MailRu", masterUrl, "auto", hdr), text);
+      } catch (e) {
+        return [];
+      }
     }
     async function extractDailymotion2(url, headers) {
       const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
@@ -587,7 +630,7 @@ var require_extractor = __commonJS({
         return [];
       }
     }
-    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion: extractDailymotion2, unpackPacked: unpackPacked2, toStream: toStream2, cleanStreamUrl: cleanStreamUrl2, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities: expandM3u8Qualities2, expandFromMasterText: expandFromMasterText2, expandArtRkUrlset: expandArtRkUrlset2 };
+    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion: extractDailymotion2, extractMailRuPublic: extractMailRuPublic2, base64Encode, unpackPacked: unpackPacked2, toStream: toStream2, cleanStreamUrl: cleanStreamUrl2, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities: expandM3u8Qualities2, expandFromMasterText: expandFromMasterText2, expandArtRkUrlset: expandArtRkUrlset2 };
   }
 });
 
@@ -713,7 +756,7 @@ var require_tmdb = __commonJS({
 // src/providers/krmzy.js
 var { fetchText, HEADERS, absoluteUrl } = require_http();
 var cheerio = require("cheerio-without-node-native");
-var { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require_extractor();
+var { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require_extractor();
 var { matchTitle } = require_normalize();
 var { getTitles } = require_tmdb();
 var metadata = {
@@ -825,6 +868,18 @@ async function findEpisode(pageUrl, season, episode) {
   } catch (e) {
     return null;
   }
+}
+function labelStreams(label, streams) {
+  if (!streams || !streams.length) return streams || [];
+  return streams.map((s) => {
+    if (!s || !s.url) return s;
+    const q = s.quality || "auto";
+    return Object.assign({}, s, {
+      provider: metadata.name,
+      name: metadata.name,
+      title: label + " " + q
+    });
+  });
 }
 function extractLinkFromObfuscatedPage(url, referers) {
   return new Promise(async (resolve) => {
@@ -1005,6 +1060,15 @@ async function loadLinks(episodeUrl) {
         }
       } else if (serverType === "youtube" || serverType === "youtube_in") {
         return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
+      } else if (serverType === "express") {
+        try {
+          if (/cloud\.mail\.ru\/public/.test(embedUrl)) {
+            return labelStreams(item.name || "Express", await extractMailRuPublic(embedUrl, { Referer: mainPageHostReferer }));
+          }
+          return labelStreams(item.name || "Express", await extractFromUrl(embedUrl, mainPageHostReferer));
+        } catch (e) {
+          return [];
+        }
       } else if (serverType === "dailymotion") {
         try {
           let dmUrl = embedUrl;
@@ -1015,7 +1079,7 @@ async function loadLinks(episodeUrl) {
         }
       } else {
         try {
-          return await extractFromUrl(embedUrl, mainPageHostReferer);
+          return labelStreams(item.name || serverType, await extractFromUrl(embedUrl, mainPageHostReferer));
         } catch (e) {
           return [];
         }

@@ -1,6 +1,6 @@
 /**
  * Aflaam - Built from nuvio/src/providers/aflaam.js
- * Generated: 2026-09-11T15:50:56.116Z
+ * Generated: 2026-09-11T16:15:57.500Z
  */
 
 // src/providers/aflaam.js

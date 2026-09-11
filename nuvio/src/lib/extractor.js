@@ -206,6 +206,54 @@ async function expandM3u8Qualities(stream) {
   return expandFromMasterText(stream, text);
 }
 
+// ---- RFC4648 base64 (btoa-compatible, no dependency) ------------------------
+
+const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function base64Encode(input) {
+  const bytes = [];
+  const s = String(input);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    bytes.push(c & 0xff);
+  }
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    out += B64_CHARS[b0 >> 2];
+    out += B64_CHARS[((b0 & 3) << 4) | (b1 >> 4)];
+    out += i + 1 < bytes.length ? B64_CHARS[((b1 & 15) << 2) | (b2 >> 6)] : "=";
+    out += i + 2 < bytes.length ? B64_CHARS[b2 & 63] : "=";
+  }
+  return out;
+}
+
+async function extractMailRuPublic(url, headers) {
+  const idMatch = String(url).match(/cloud\.mail\.ru\/public\/([A-Za-z0-9/_-]+)\/?$/)
+    || String(url).match(/cloud\.mail\.ru\/public\/([A-Za-z0-9/_-]+)\/?\?/);
+  if (!idMatch) return [];
+  const id = String(idMatch[1]).replace(/\/+$/, "");
+  const hdr = { Referer: "https://cloud.mail.ru/" };
+  try {
+    const page = await fetchText("https://cloud.mail.ru/public/" + id, { headers: hdr });
+    const m = /"videowl_view":\{"count":"\d+","url":"([^"]+)"/.exec(page);
+    const idToken = m ? m[1] : null;
+    if (!idToken) return [];
+    const masterUrl = idToken + "/0p/" + base64Encode(id) + ".m3u8?double_encode=1";
+    let text;
+    try {
+      text = await fetchText(masterUrl, { headers: hdr });
+    } catch (e) {
+      text = "";
+    }
+    if (!/^\s*#EXTM3U/.test(text || "")) return [];
+    return expandFromMasterText(toStream("MailRu", "MailRu", masterUrl, "auto", hdr), text);
+  } catch (e) {
+    return [];
+  }
+}
+
 async function extractDailymotion(url, headers) {
   const idMatch = url.match(/\/video\/([a-zA-Z0-9]+)/);
   if (!idMatch) return [];
@@ -612,4 +660,4 @@ async function extractFromUrl(url, referer) {
   }
 }
 
-module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText, expandArtRkUrlset };
+module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, extractMailRuPublic, base64Encode, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText, expandArtRkUrlset };

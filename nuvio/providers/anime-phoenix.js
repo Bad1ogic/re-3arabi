@@ -1,6 +1,6 @@
 /**
  * Anime-Phoenix - Built from nuvio/src/providers/anime-phoenix.js
- * Generated: 2026-09-11T15:50:56.283Z
+ * Generated: 2026-09-11T16:15:57.676Z
  */
 
 // src/providers/anime-phoenix.js

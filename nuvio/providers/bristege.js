@@ -1,6 +1,6 @@
 /**
  * Brstej - Built from nuvio/src/providers/bristege.js
- * Generated: 2026-09-11T15:50:56.357Z
+ * Generated: 2026-09-11T16:15:57.747Z
  */
 
 // src/providers/bristege.js

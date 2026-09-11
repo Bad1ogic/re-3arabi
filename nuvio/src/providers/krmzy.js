@@ -1,6 +1,6 @@
 const { fetchText, HEADERS, absoluteUrl } = require("../lib/http.js");
 const cheerio = require("cheerio-without-node-native");
-const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require("../lib/extractor.js");
+const { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require("../lib/extractor.js");
 const { matchTitle } = require("../lib/normalize.js");
 const { getTitles } = require("../lib/tmdb.js");
 
@@ -121,6 +121,19 @@ async function findEpisode(pageUrl, season, episode) {
   } catch (e) {
     return null;
   }
+}
+
+function labelStreams(label, streams) {
+  if (!streams || !streams.length) return streams || [];
+  return streams.map((s) => {
+    if (!s || !s.url) return s;
+    const q = s.quality || "auto";
+    return Object.assign({}, s, {
+      provider: metadata.name,
+      name: metadata.name,
+      title: label + " " + q
+    });
+  });
 }
 
 function extractLinkFromObfuscatedPage(url, referers) {
@@ -286,6 +299,15 @@ async function loadLinks(episodeUrl) {
         }
       } else if (serverType === "youtube" || serverType === "youtube_in") {
         return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
+      } else if (serverType === "express") {
+        try {
+          if (/cloud\.mail\.ru\/public/.test(embedUrl)) {
+            return labelStreams(item.name || "Express", await extractMailRuPublic(embedUrl, { Referer: mainPageHostReferer }));
+          }
+          return labelStreams(item.name || "Express", await extractFromUrl(embedUrl, mainPageHostReferer));
+        } catch (e) {
+          return [];
+        }
       } else if (serverType === "dailymotion") {
         try {
           let dmUrl = embedUrl;
@@ -296,7 +318,7 @@ async function loadLinks(episodeUrl) {
         }
       } else {
         try {
-          return await extractFromUrl(embedUrl, mainPageHostReferer);
+          return labelStreams(item.name || serverType, await extractFromUrl(embedUrl, mainPageHostReferer));
         } catch (e) {
           return [];
         }
