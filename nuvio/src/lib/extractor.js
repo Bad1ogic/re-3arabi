@@ -166,6 +166,35 @@ function expandFromMasterText(stream, text) {
   return out.length > 1 ? out : [stream];
 }
 
+const ARTRK_LETTER_HEIGHT = { l: 360, n: 480, h: 720, f: 1080 };
+const ARTRK_LETTER_BW = { l: 320000, n: 600000, h: 1300000, f: 2500000 };
+
+// artrk-online style zooqoo master: .../{id}_,l,n,h,.urlset/master.m3u8?t=...
+// The tier letters are part of the URL itself, so the quality set is
+// deterministic without downloading the (varying) master playlist.
+function expandArtRkUrlset(stream) {
+  const url = String(stream.url || "");
+  const m = /^(.+)_([a-z,]+)\.urlset\/master\.m3u8(\?.*)?$/i.exec(url);
+  if (!m) return null;
+  const letters = (m[2] || "")
+    .split(",")
+    .map((c) => c.toLowerCase())
+    .filter((c) => ARTRK_LETTER_HEIGHT[c] !== undefined);
+  if (!letters.length) return null;
+  const base = m[1];
+  const query = m[3] || "";
+  const out = [];
+  const seen = new Set();
+  for (const c of letters.sort((x, y) => (ARTRK_LETTER_BW[y] || 0) - (ARTRK_LETTER_BW[x] || 0))) {
+    if (seen.has(c)) continue;
+    seen.add(c);
+    const height = ARTRK_LETTER_HEIGHT[c];
+    const quality = height + "p AVC";
+    out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers)));
+  }
+  return out.length > 1 ? out : null;
+}
+
 async function expandM3u8Qualities(stream) {
   if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
   let text;
@@ -583,4 +612,4 @@ async function extractFromUrl(url, referer) {
   }
 }
 
-module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText };
+module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText, expandArtRkUrlset };

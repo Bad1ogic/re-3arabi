@@ -1,6 +1,6 @@
 const { fetchText, HEADERS, absoluteUrl } = require("../lib/http.js");
 const cheerio = require("cheerio-without-node-native");
-const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities } = require("../lib/extractor.js");
+const { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require("../lib/extractor.js");
 const { matchTitle } = require("../lib/normalize.js");
 const { getTitles } = require("../lib/tmdb.js");
 
@@ -155,6 +155,14 @@ async function resolveHlsRefererAndExpand(streamUrl, originEmbedUrl, baseTitle) 
       return "https://qesen.net/";
     }
   })();
+  const defaultHdr = {
+    Referer: iframeHostReferer,
+    Origin: iframeHostReferer.replace(/\/$/, ""),
+    "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
+    Accept: "*/*"
+  };
+  const urlsetStreams = expandArtRkUrlset(toStream(metadata.name, baseTitle, streamUrl, "auto", defaultHdr));
+  if (urlsetStreams) return urlsetStreams;
   const candidates = [iframeHostReferer, "https://qesen.net/"];
   for (const ref of candidates) {
     try {

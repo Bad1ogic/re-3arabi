@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-10T22:36:41.428Z
+ * Generated: 2026-09-11T15:50:56.538Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -195,6 +195,27 @@ var require_extractor = __commonJS({
         out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
       }
       return out.length > 1 ? out : [stream];
+    }
+    var ARTRK_LETTER_HEIGHT = { l: 360, n: 480, h: 720, f: 1080 };
+    var ARTRK_LETTER_BW = { l: 32e4, n: 6e5, h: 13e5, f: 25e5 };
+    function expandArtRkUrlset2(stream) {
+      const url = String(stream.url || "");
+      const m = /^(.+)_([a-z,]+)\.urlset\/master\.m3u8(\?.*)?$/i.exec(url);
+      if (!m) return null;
+      const letters = (m[2] || "").split(",").map((c) => c.toLowerCase()).filter((c) => ARTRK_LETTER_HEIGHT[c] !== void 0);
+      if (!letters.length) return null;
+      const base = m[1];
+      const query = m[3] || "";
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const c of letters.sort((x, y) => (ARTRK_LETTER_BW[y] || 0) - (ARTRK_LETTER_BW[x] || 0))) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        const height = ARTRK_LETTER_HEIGHT[c];
+        const quality = height + "p AVC";
+        out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers)));
+      }
+      return out.length > 1 ? out : null;
     }
     async function expandM3u8Qualities2(stream) {
       if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
@@ -566,7 +587,7 @@ var require_extractor = __commonJS({
         return [];
       }
     }
-    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion: extractDailymotion2, unpackPacked: unpackPacked2, toStream: toStream2, cleanStreamUrl: cleanStreamUrl2, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities: expandM3u8Qualities2, expandFromMasterText: expandFromMasterText2 };
+    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion: extractDailymotion2, unpackPacked: unpackPacked2, toStream: toStream2, cleanStreamUrl: cleanStreamUrl2, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities: expandM3u8Qualities2, expandFromMasterText: expandFromMasterText2, expandArtRkUrlset: expandArtRkUrlset2 };
   }
 });
 
@@ -692,7 +713,7 @@ var require_tmdb = __commonJS({
 // src/providers/krmzy.js
 var { fetchText, HEADERS, absoluteUrl } = require_http();
 var cheerio = require("cheerio-without-node-native");
-var { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities } = require_extractor();
+var { unpackPacked, extractFromUrl, extractDailymotion, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require_extractor();
 var { matchTitle } = require_normalize();
 var { getTitles } = require_tmdb();
 var metadata = {
@@ -836,6 +857,14 @@ async function resolveHlsRefererAndExpand(streamUrl, originEmbedUrl, baseTitle) 
       return "https://qesen.net/";
     }
   })();
+  const defaultHdr = {
+    Referer: iframeHostReferer,
+    Origin: iframeHostReferer.replace(/\/$/, ""),
+    "User-Agent": HEADERS["User-Agent"] || "Mozilla/5.0",
+    Accept: "*/*"
+  };
+  const urlsetStreams = expandArtRkUrlset(toStream(metadata.name, baseTitle, streamUrl, "auto", defaultHdr));
+  if (urlsetStreams) return urlsetStreams;
   const candidates = [iframeHostReferer, "https://qesen.net/"];
   for (const ref of candidates) {
     try {

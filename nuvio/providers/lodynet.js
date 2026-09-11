@@ -1,6 +1,6 @@
 /**
  * LodyNet - Built from nuvio/src/providers/lodynet.js
- * Generated: 2026-09-10T22:36:41.449Z
+ * Generated: 2026-09-11T15:50:56.560Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -314,6 +314,27 @@ var require_extractor = __commonJS({
         out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
       }
       return out.length > 1 ? out : [stream];
+    }
+    var ARTRK_LETTER_HEIGHT = { l: 360, n: 480, h: 720, f: 1080 };
+    var ARTRK_LETTER_BW = { l: 32e4, n: 6e5, h: 13e5, f: 25e5 };
+    function expandArtRkUrlset(stream) {
+      const url = String(stream.url || "");
+      const m = /^(.+)_([a-z,]+)\.urlset\/master\.m3u8(\?.*)?$/i.exec(url);
+      if (!m) return null;
+      const letters = (m[2] || "").split(",").map((c) => c.toLowerCase()).filter((c) => ARTRK_LETTER_HEIGHT[c] !== void 0);
+      if (!letters.length) return null;
+      const base = m[1];
+      const query = m[3] || "";
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const c of letters.sort((x, y) => (ARTRK_LETTER_BW[y] || 0) - (ARTRK_LETTER_BW[x] || 0))) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        const height = ARTRK_LETTER_HEIGHT[c];
+        const quality = height + "p AVC";
+        out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers)));
+      }
+      return out.length > 1 ? out : null;
     }
     async function expandM3u8Qualities(stream) {
       if (!stream || !stream.url || !/\.m3u8(\?.*)?$/i.test(stream.url)) return [stream];
@@ -685,7 +706,7 @@ var require_extractor = __commonJS({
         return [];
       }
     }
-    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer: extractSmartPlayer2, extractDailymotion, unpackPacked, toStream: toStream2, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText };
+    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer: extractSmartPlayer2, extractDailymotion, unpackPacked, toStream: toStream2, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText, expandArtRkUrlset };
   }
 });
 
