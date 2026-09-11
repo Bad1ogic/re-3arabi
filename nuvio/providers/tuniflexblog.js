@@ -1,6 +1,6 @@
 /**
  * TuniflexBlog - Built from nuvio/src/providers/tuniflexblog.js
- * Generated: 2026-09-11T16:15:58.065Z
+ * Generated: 2026-09-11T16:57:40.491Z
  */
 
 // src/providers/tuniflexblog.js

@@ -1,6 +1,6 @@
 /**
  * Cimalight - Built from nuvio/src/providers/cimalight.js
- * Generated: 2026-09-11T16:15:57.797Z
+ * Generated: 2026-09-11T16:57:40.223Z
  */
 
 // src/providers/cimalight.js

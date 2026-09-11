@@ -1,6 +1,6 @@
 /**
  * Cimatn - Built from nuvio/src/providers/cimatn.js
- * Generated: 2026-09-11T16:15:57.809Z
+ * Generated: 2026-09-11T16:57:40.236Z
  */
 
 // src/providers/cimatn.js

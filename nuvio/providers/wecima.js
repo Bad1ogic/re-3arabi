@@ -1,6 +1,6 @@
 /**
  * WeCima - Built from nuvio/src/providers/wecima.js
- * Generated: 2026-09-11T16:15:58.123Z
+ * Generated: 2026-09-11T16:57:40.547Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -366,11 +366,12 @@ var require_extractor = __commonJS({
       }
       return out;
     }
+    var MAILRU_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     async function extractMailRuPublic(url, headers) {
       const idMatch = String(url).match(/cloud\.mail\.ru\/public\/([A-Za-z0-9/_-]+)\/?$/) || String(url).match(/cloud\.mail\.ru\/public\/([A-Za-z0-9/_-]+)\/?\?/);
       if (!idMatch) return [];
       const id = String(idMatch[1]).replace(/\/+$/, "");
-      const hdr = { Referer: "https://cloud.mail.ru/" };
+      const hdr = { Referer: "https://cloud.mail.ru/", "User-Agent": MAILRU_UA };
       try {
         const page = await fetchText("https://cloud.mail.ru/public/" + id, { headers: hdr });
         const m = /"videowl_view":\{"count":"\d+","url":"([^"]+)"/.exec(page);

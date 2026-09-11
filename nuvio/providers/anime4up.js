@@ -1,6 +1,6 @@
 /**
  * Anime4up - Built from nuvio/src/providers/anime4up.js
- * Generated: 2026-09-11T16:15:57.699Z
+ * Generated: 2026-09-11T16:57:40.125Z
  */
 
 // src/providers/anime4up.js

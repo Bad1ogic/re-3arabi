@@ -1,6 +1,6 @@
 /**
  * Alooytv - Built from nuvio/src/providers/alooytv.js
- * Generated: 2026-09-11T16:15:57.663Z
+ * Generated: 2026-09-11T16:57:40.088Z
  */
 
 // src/providers/alooytv.js

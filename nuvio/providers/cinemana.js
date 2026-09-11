@@ -1,6 +1,6 @@
 /**
  * Shabakaty Cinemana - Built from nuvio/src/providers/cinemana.js
- * Generated: 2026-09-11T16:15:57.821Z
+ * Generated: 2026-09-11T16:57:40.250Z
  */
 
 // src/providers/cinemana.js
