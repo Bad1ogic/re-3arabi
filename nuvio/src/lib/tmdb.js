@@ -57,4 +57,25 @@ async function getTitles(tmdbId, mediaType) {
   return titles;
 }
 
-module.exports = { getMedia, getTitles, TMDB_API_KEY };
+// Per-season episode counts for a TV show (seasons numbered >= 1, i.e.
+// excluding the "specials" season 0). Used by providers whose site numbers
+// episodes continuously across seasons (no season separation).
+async function getSeasonCounts(tmdbId, mediaType) {
+  if (mediaType === "movie") return [];
+  try {
+    const res = await fetch(
+      TMDB_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
+      { skipSizeCheck: true }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const seasons = data.seasons || [];
+    return seasons
+      .filter((s) => s.season_number >= 1)
+      .map((s) => ({ season: s.season_number, count: s.episode_count || 0 }));
+  } catch (e) {
+    return [];
+  }
+}
+
+module.exports = { getMedia, getTitles, getSeasonCounts, TMDB_API_KEY };

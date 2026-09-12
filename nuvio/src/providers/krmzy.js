@@ -2,7 +2,7 @@ const { fetchText, HEADERS, absoluteUrl } = require("../lib/http.js");
 const cheerio = require("cheerio-without-node-native");
 const { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require("../lib/extractor.js");
 const { matchTitle } = require("../lib/normalize.js");
-const { getTitles } = require("../lib/tmdb.js");
+const { getTitles, getSeasonCounts } = require("../lib/tmdb.js");
 
 const metadata = {
   id: "krmzy",
@@ -216,6 +216,18 @@ async function findSeriesUrl(url) {
   const seriesAnchor = $("div.singleSeries div.info h1 a").first().attr("href");
   if (seriesAnchor) return ensureHttp(seriesAnchor);
   return null;
+}
+
+// krmzy numbers episodes continuously from the series start (1..N) and does
+// not separate seasons. Map a TMDB (season, episode) pair to that continuous
+// number by summing the episode counts of all earlier seasons (season >= 1).
+// Season 1 yields an offset of 0, so it behaves exactly as before.
+function seasonOffset(seasonCounts, season) {
+  let off = 0;
+  for (const sc of seasonCounts || []) {
+    if (sc && typeof sc.season === "number" && sc.season < season) off += sc.count || 0;
+  }
+  return off;
 }
 
 async function findEpisode(pageUrl, season, episode) {
@@ -476,7 +488,14 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     const page = await resolveSeriesPage(queryTitles);
     if (!page) return [];
     if (mediaType === "movie") return [];
-    const ep = await findEpisode(page.url, season || 1, episode || 1);
+    let s = parseInt(season, 10);
+    if (isNaN(s) || s < 1) s = 1;
+    let e = parseInt(episode, 10);
+    if (isNaN(e) || e < 1) e = 1;
+    // The site has no seasons, so resolve the continuous episode number.
+    const counts = await getSeasonCounts(tmdbId, mediaType);
+    const continuous = seasonOffset(counts, s) + e;
+    const ep = await findEpisode(page.url, s, continuous);
     if (!ep) return [];
     return await loadLinks(ep.url);
   } catch (e) {

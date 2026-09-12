@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-11T22:06:38.019Z
+ * Generated: 2026-09-12T16:46:55.780Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -750,7 +750,22 @@ var require_tmdb = __commonJS({
       }
       return titles;
     }
-    module2.exports = { getMedia, getTitles: getTitles2, TMDB_API_KEY };
+    async function getSeasonCounts2(tmdbId, mediaType) {
+      if (mediaType === "movie") return [];
+      try {
+        const res = await fetch(
+          TMDB_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY + "&language=en-US",
+          { skipSizeCheck: true }
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        const seasons = data.seasons || [];
+        return seasons.filter((s) => s.season_number >= 1).map((s) => ({ season: s.season_number, count: s.episode_count || 0 }));
+      } catch (e) {
+        return [];
+      }
+    }
+    module2.exports = { getMedia, getTitles: getTitles2, getSeasonCounts: getSeasonCounts2, TMDB_API_KEY };
   }
 });
 
@@ -759,7 +774,7 @@ var { fetchText, HEADERS, absoluteUrl } = require_http();
 var cheerio = require("cheerio-without-node-native");
 var { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require_extractor();
 var { matchTitle } = require_normalize();
-var { getTitles } = require_tmdb();
+var { getTitles, getSeasonCounts } = require_tmdb();
 var metadata = {
   id: "krmzy",
   name: "Krmzy",
@@ -935,6 +950,13 @@ async function findSeriesUrl(url) {
   const seriesAnchor = $("div.singleSeries div.info h1 a").first().attr("href");
   if (seriesAnchor) return ensureHttp(seriesAnchor);
   return null;
+}
+function seasonOffset(seasonCounts, season) {
+  let off = 0;
+  for (const sc of seasonCounts || []) {
+    if (sc && typeof sc.season === "number" && sc.season < season) off += sc.count || 0;
+  }
+  return off;
 }
 async function findEpisode(pageUrl, season, episode) {
   let url = pageUrl;
@@ -1203,7 +1225,13 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     const page = await resolveSeriesPage(queryTitles);
     if (!page) return [];
     if (mediaType === "movie") return [];
-    const ep = await findEpisode(page.url, season || 1, episode || 1);
+    let s = parseInt(season, 10);
+    if (isNaN(s) || s < 1) s = 1;
+    let e = parseInt(episode, 10);
+    if (isNaN(e) || e < 1) e = 1;
+    const counts = await getSeasonCounts(tmdbId, mediaType);
+    const continuous = seasonOffset(counts, s) + e;
+    const ep = await findEpisode(page.url, s, continuous);
     if (!ep) return [];
     return await loadLinks(ep.url);
   } catch (e) {
