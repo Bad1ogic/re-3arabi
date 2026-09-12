@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-12T16:46:55.780Z
+ * Generated: 2026-09-12T17:39:27.790Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -958,7 +958,13 @@ function seasonOffset(seasonCounts, season) {
   }
   return off;
 }
-async function findEpisode(pageUrl, season, episode) {
+function parseSeasonFromTitle(title) {
+  const t = String(title || "");
+  const before = t.split(/الحلقة|episode/i)[0];
+  const nums = before.match(/\d+/g);
+  return nums && nums.length ? parseInt(nums[nums.length - 1], 10) : 1;
+}
+async function findEpisode(pageUrl, season, episode, continuousNum) {
   let url = pageUrl;
   if (!/\/series\/[\s\S]*\/?$/.test(url)) {
     try {
@@ -981,13 +987,20 @@ async function findEpisode(pageUrl, season, episode) {
         const n = parseInt($(sEl).text().trim(), 10);
         if (!isNaN(n)) num = n;
       });
-      if (href && !isNaN(num)) eps.push({ url: ensureHttp(href), name: epTitle, episode: num });
+      if (href && !isNaN(num)) {
+        eps.push({ url: ensureHttp(href), name: epTitle, episode: num, season: parseSeasonFromTitle(epTitle) });
+      }
     });
+    if (!eps.length) return null;
     eps.reverse();
-    const target = typeof episode === "number" ? episode : parseInt(episode, 10);
-    if (isNaN(target)) return null;
-    const hit = eps.find((e) => e.episode === target);
-    return hit || null;
+    const s = parseInt(season, 10) || 1;
+    const e = parseInt(episode, 10) || 1;
+    const isPerSeason = new Set(eps.map((x) => x.episode)).size < eps.length;
+    if (isPerSeason) {
+      return eps.find((x) => x.episode === e && x.season === s) || null;
+    }
+    const target = !isNaN(continuousNum) ? continuousNum : e;
+    return eps.find((x) => x.episode === target) || null;
   } catch (e) {
     return null;
   }
@@ -1231,7 +1244,7 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     if (isNaN(e) || e < 1) e = 1;
     const counts = await getSeasonCounts(tmdbId, mediaType);
     const continuous = seasonOffset(counts, s) + e;
-    const ep = await findEpisode(page.url, s, continuous);
+    const ep = await findEpisode(page.url, s, e, continuous);
     if (!ep) return [];
     return await loadLinks(ep.url);
   } catch (e) {

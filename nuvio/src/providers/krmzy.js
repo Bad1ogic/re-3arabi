@@ -230,7 +230,20 @@ function seasonOffset(seasonCounts, season) {
   return off;
 }
 
-async function findEpisode(pageUrl, season, episode) {
+// Some krmzy shows restart numbering per season and encode the season in the
+// episode title, e.g. "الحفرة 4 – الحلقة 39" (season 4, episode 39). The
+// season is the trailing number before the "الحلقة" marker; when absent it is
+// season 1 (krmzy omits the marker for the first season).
+function parseSeasonFromTitle(title) {
+  const t = String(title || "");
+  const before = t.split(/الحلقة|episode/i)[0];
+  // The season is the last number before the "الحلقة" marker (a dash such as
+  // "الحفرة 2 – الحلقة 1" sits between it and the marker). Absent => season 1.
+  const nums = before.match(/\d+/g);
+  return nums && nums.length ? parseInt(nums[nums.length - 1], 10) : 1;
+}
+
+async function findEpisode(pageUrl, season, episode, continuousNum) {
   let url = pageUrl;
   if (!/\/series\/[\s\S]*\/?$/.test(url)) {
     try {
@@ -256,13 +269,24 @@ async function findEpisode(pageUrl, season, episode) {
         const n = parseInt($(sEl).text().trim(), 10);
         if (!isNaN(n)) num = n;
       });
-      if (href && !isNaN(num)) eps.push({ url: ensureHttp(href), name: epTitle, episode: num });
+      if (href && !isNaN(num)) {
+        eps.push({ url: ensureHttp(href), name: epTitle, episode: num, season: parseSeasonFromTitle(epTitle) });
+      }
     });
+    if (!eps.length) return null;
     eps.reverse();
-    const target = typeof episode === "number" ? episode : parseInt(episode, 10);
-    if (isNaN(target)) return null;
-    const hit = eps.find((e) => e.episode === target);
-    return hit || null;
+    const s = parseInt(season, 10) || 1;
+    const e = parseInt(episode, 10) || 1;
+    // Detect the numbering convention: per-season pages repeat episode numbers
+    // (one run of 1..N per season); continuous pages number 1..N across the
+    // whole series (all numbers unique).
+    const isPerSeason = new Set(eps.map((x) => x.episode)).size < eps.length;
+    if (isPerSeason) {
+      // Match by the season encoded in the title plus the per-season number.
+      return eps.find((x) => x.episode === e && x.season === s) || null;
+    }
+    const target = !isNaN(continuousNum) ? continuousNum : e;
+    return eps.find((x) => x.episode === target) || null;
   } catch (e) {
     return null;
   }
@@ -492,10 +516,11 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     if (isNaN(s) || s < 1) s = 1;
     let e = parseInt(episode, 10);
     if (isNaN(e) || e < 1) e = 1;
-    // The site has no seasons, so resolve the continuous episode number.
+    // Resolve the continuous number for sites that number episodes across the
+    // whole series; findEpisode also handles per-season numbering directly.
     const counts = await getSeasonCounts(tmdbId, mediaType);
     const continuous = seasonOffset(counts, s) + e;
-    const ep = await findEpisode(page.url, s, continuous);
+    const ep = await findEpisode(page.url, s, e, continuous);
     if (!ep) return [];
     return await loadLinks(ep.url);
   } catch (e) {
