@@ -24,8 +24,31 @@ class YacineTVProvider : MainAPI() {
     data class LinkData(
         val id: String,
         val name: String,
-        val poster: String?
+        val poster: String?,
+        val tier: String?
     )
+
+    private val tierRegex = Regex("""\((\d+\s*P)\)""")
+
+    private fun tierOf(categoryName: String?): String? =
+        categoryName?.let { tierRegex.find(it)?.groupValues?.get(1)?.replace(" ", "") }
+
+    private fun displayName(channelName: String, tier: String?): String =
+        if (tier.isNullOrBlank()) channelName else "$channelName ($tier)"
+
+    private fun qualityFromTier(tier: String?): Int {
+        val h = tier?.replace("P", "")?.replace(" ", "")?.toIntOrNull() ?: return Qualities.Unknown.value
+        return when {
+            h >= 2160 -> Qualities.P2160.value
+            h >= 1440 -> Qualities.P1440.value
+            h >= 1080 -> Qualities.P1080.value
+            h >= 720 -> Qualities.P720.value
+            h >= 480 -> Qualities.P480.value
+            h >= 360 -> Qualities.P360.value
+            h >= 240 -> Qualities.P240.value
+            else -> Qualities.Unknown.value
+        }
+    }
 
     private fun decrypt(encryptedText: String, tHeader: String): String {
         return try {
@@ -62,8 +85,10 @@ class YacineTVProvider : MainAPI() {
             if (channels.isEmpty()) return@mapNotNull null
 
             val channelItems = channels.map { chan ->
-                val data = LinkData(chan.id.toString(), chan.name ?: "", chan.logo).toJson()
-                newLiveSearchResponse(chan.name ?: "Unknown", data, TvType.Live) {
+                val tier = tierOf(cat.name)
+                val channelName = chan.name ?: "Unknown"
+                val data = LinkData(chan.id.toString(), displayName(channelName, tier), chan.logo, tier).toJson()
+                newLiveSearchResponse(displayName(channelName, tier), data, TvType.Live) {
                     this.posterUrl = chan.logo
                 }
             }
@@ -78,10 +103,13 @@ class YacineTVProvider : MainAPI() {
         categories.forEach { cat ->
             val channels = fetchYacine("categories/${cat.id}/channels")?.data ?: emptyList()
             channels.forEach { chan ->
-                if (chan.name?.contains(query, ignoreCase = true) == true) {
-                    val data = LinkData(chan.id.toString(), chan.name ?: "", chan.logo).toJson()
+                val tier = tierOf(cat.name)
+                val channelName = chan.name ?: ""
+                if (channelName.contains(query, ignoreCase = true) || (tier != null && tier.contains(query, ignoreCase = true))) {
+                    val label = displayName(channelName, tier)
+                    val data = LinkData(chan.id.toString(), label, chan.logo, tier).toJson()
                     results.add(
-                        newLiveSearchResponse(chan.name, data, TvType.Live) {
+                        newLiveSearchResponse(label, data, TvType.Live) {
                             this.posterUrl = chan.logo
                         }
                     )
@@ -132,7 +160,7 @@ class YacineTVProvider : MainAPI() {
                         finalUrl
                     ) {
                         this.headers = streamHeaders
-                        this.quality = Qualities.Unknown.value
+                        this.quality = qualityFromTier(linkData.tier)
                     }
                 )
             }
