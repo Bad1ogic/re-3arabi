@@ -18,6 +18,17 @@ function stripUrls(raw) {
     .replace(/&amp;/g, "&");
 }
 
+function htmlUnescape(s) {
+  return String(s)
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 function unescapeJsString(str) {
   return String(str).replace(/\\(?:x([0-9a-fA-F]{2})|[\\'"nrt])/g, (m, h) => {
     if (h) return String.fromCharCode(parseInt(h, 16));
@@ -161,7 +172,9 @@ function expandFromMasterText(stream, text) {
     const key = (v.height ? "h" + v.height : "b" + v.bandwidth) + "_" + (code || "u");
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
+    const expanded = toStream(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers));
+    expanded.name = stream.name || expanded.name;
+    out.push(expanded);
   }
   return out.length > 1 ? out : [stream];
 }
@@ -190,7 +203,9 @@ function expandArtRkUrlset(stream) {
     seen.add(c);
     const height = ARTRK_LETTER_HEIGHT[c];
     const quality = height + "p AVC";
-    out.push(toStream(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers)));
+    const expanded = toStream(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers));
+    expanded.name = stream.name || expanded.name;
+    out.push(expanded);
   }
   return out.length > 1 ? out : null;
 }
@@ -296,6 +311,76 @@ async function extractDailymotion(url, headers) {
     return [];
   }
   return streams;
+}
+
+// ---- ok.ru (OK video) ------------------------------------------------------
+// The embed page carries the player config in a data-options attribute
+// (HTML-escaped JSON). The playable sources live under flashvars.metadata:
+// hlsManifestUrl (a master .m3u8) and a videos[] list of progressive URLs.
+// The URLs are signed and bound to the requesting IP, so the embed fetch and
+// the manifest fetch must originate from the same client (true on-device).
+// The primary CDN edge (ok*.vkuser.net) is geo-blocked/slow without a VPN, but
+// the failoverHosts (okcdn.ru) resolve fast and serve the same signed manifest;
+// its variant URLs are relative, so rewriting the master host makes the whole
+// quality ladder resolve to a reachable CDN.
+async function extractOkRu(url, referer) {
+  const idMatch = String(url).match(/ok\.ru\/(?:videoembed|video|embed)\/(\d+)/);
+  if (!idMatch) return [];
+  const id = idMatch[1];
+  const embedUrl = "https://ok.ru/videoembed/" + id;
+  const hdr = { Referer: referer || "https://ok.ru/", "User-Agent": MAILRU_UA };
+  let html;
+  try {
+    html = await fetchText(embedUrl, { headers: hdr });
+  } catch (e) {
+    return [];
+  }
+  const attrMatch = html.match(/data-options="([^"]*)"/);
+  if (!attrMatch) return [];
+  let meta = null;
+  try {
+    const obj = JSON.parse(htmlUnescape(attrMatch[1]));
+    meta = obj && obj.flashvars && obj.flashvars.metadata;
+  } catch (e) {
+    meta = null;
+  }
+  if (!meta) return [];
+
+  const failovers = Array.isArray(meta.failoverHosts) ? meta.failoverHosts.filter(Boolean) : [];
+  const withHost = (u, fh) => String(u).replace(/^(https?:\/\/)[^/]+/, "$1" + fh);
+
+  if (meta.hlsManifestUrl) {
+    const orig = cleanStreamUrl(meta.hlsManifestUrl);
+    const candidates = [];
+    for (const fh of failovers) candidates.push(withHost(orig, fh));
+    candidates.push(orig);
+    for (const cand of candidates) {
+      const base = toStream("Krmzy", "OK.ru", cand, "auto", hdr);
+      let text;
+      try {
+        text = await fetchText(cand, { headers: hdr });
+      } catch (e) {
+        continue;
+      }
+      if (!/^\s*#EXTM3U/.test(text || "")) continue;
+      const expanded = expandFromMasterText(base, text);
+      if (expanded && expanded.length) return expanded;
+    }
+    return [toStream("Krmzy", "OK.ru", candidates[0], "auto", hdr)];
+  }
+
+  if (Array.isArray(meta.videos)) {
+    const QMAP = { full: "1080p", hd: "720p", sd: "480p", low: "360p", lowest: "240p", mobile: "360p" };
+    const streams = [];
+    for (const v of meta.videos) {
+      if (!v || !v.url) continue;
+      const q = QMAP[v.name] || "auto";
+      const u = cleanStreamUrl(v.url);
+      streams.push(toStream("Krmzy", "OK.ru " + (QMAP[v.name] || v.name || ""), failovers.length ? withHost(u, failovers[0]) : u, q, hdr));
+    }
+    return streams;
+  }
+  return [];
 }
 
 // ---- cipher functions (SmartPlayer style AES/CBC) -------------------------
@@ -662,4 +747,4 @@ async function extractFromUrl(url, referer) {
   }
 }
 
-module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, extractMailRuPublic, base64Encode, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText, expandArtRkUrlset };
+module.exports = { extractFromUrl, extractStreamsFromText, extractSmartPlayer, extractDailymotion, extractMailRuPublic, extractOkRu, base64Encode, htmlUnescape, unpackPacked, toStream, cleanStreamUrl, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities, expandFromMasterText, expandArtRkUrlset };

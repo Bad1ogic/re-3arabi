@@ -1,6 +1,6 @@
 /**
  * Krmzy - Built from nuvio/src/providers/krmzy.js
- * Generated: 2026-09-12T17:39:27.790Z
+ * Generated: 2026-10-15T06:41:46.012Z
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -60,6 +60,9 @@ var require_extractor = __commonJS({
     }
     function stripUrls(raw) {
       return String(raw).replace(/\\\//g, "/").replace(/&amp;/g, "&");
+    }
+    function htmlUnescape(s) {
+      return String(s).replace(/&quot;/g, '"').replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
     }
     function unescapeJsString(str) {
       return String(str).replace(/\\(?:x([0-9a-fA-F]{2})|[\\'"nrt])/g, (m, h) => {
@@ -192,7 +195,9 @@ var require_extractor = __commonJS({
         const key = (v.height ? "h" + v.height : "b" + v.bandwidth) + "_" + (code || "u");
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers)));
+        const expanded = toStream2(stream.provider, (stream.title || stream.provider) + " " + label, v.url, quality, Object.assign({}, stream.headers));
+        expanded.name = stream.name || expanded.name;
+        out.push(expanded);
       }
       return out.length > 1 ? out : [stream];
     }
@@ -213,7 +218,9 @@ var require_extractor = __commonJS({
         seen.add(c);
         const height = ARTRK_LETTER_HEIGHT[c];
         const quality = height + "p AVC";
-        out.push(toStream2(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers)));
+        const expanded = toStream2(stream.provider, (stream.title || stream.provider) + " " + height + "p AVC", base + "_" + c + "/index-v1-a1.m3u8" + query, quality, Object.assign({}, stream.headers));
+        expanded.name = stream.name || expanded.name;
+        out.push(expanded);
       }
       return out.length > 1 ? out : null;
     }
@@ -311,6 +318,62 @@ var require_extractor = __commonJS({
         return [];
       }
       return streams;
+    }
+    async function extractOkRu2(url, referer) {
+      const idMatch = String(url).match(/ok\.ru\/(?:videoembed|video|embed)\/(\d+)/);
+      if (!idMatch) return [];
+      const id = idMatch[1];
+      const embedUrl = "https://ok.ru/videoembed/" + id;
+      const hdr = { Referer: referer || "https://ok.ru/", "User-Agent": MAILRU_UA };
+      let html;
+      try {
+        html = await fetchText2(embedUrl, { headers: hdr });
+      } catch (e) {
+        return [];
+      }
+      const attrMatch = html.match(/data-options="([^"]*)"/);
+      if (!attrMatch) return [];
+      let meta = null;
+      try {
+        const obj = JSON.parse(htmlUnescape(attrMatch[1]));
+        meta = obj && obj.flashvars && obj.flashvars.metadata;
+      } catch (e) {
+        meta = null;
+      }
+      if (!meta) return [];
+      const failovers = Array.isArray(meta.failoverHosts) ? meta.failoverHosts.filter(Boolean) : [];
+      const withHost = (u, fh) => String(u).replace(/^(https?:\/\/)[^/]+/, "$1" + fh);
+      if (meta.hlsManifestUrl) {
+        const orig = cleanStreamUrl2(meta.hlsManifestUrl);
+        const candidates = [];
+        for (const fh of failovers) candidates.push(withHost(orig, fh));
+        candidates.push(orig);
+        for (const cand of candidates) {
+          const base = toStream2("Krmzy", "OK.ru", cand, "auto", hdr);
+          let text;
+          try {
+            text = await fetchText2(cand, { headers: hdr });
+          } catch (e) {
+            continue;
+          }
+          if (!/^\s*#EXTM3U/.test(text || "")) continue;
+          const expanded = expandFromMasterText2(base, text);
+          if (expanded && expanded.length) return expanded;
+        }
+        return [toStream2("Krmzy", "OK.ru", candidates[0], "auto", hdr)];
+      }
+      if (Array.isArray(meta.videos)) {
+        const QMAP = { full: "1080p", hd: "720p", sd: "480p", low: "360p", lowest: "240p", mobile: "360p" };
+        const streams = [];
+        for (const v of meta.videos) {
+          if (!v || !v.url) continue;
+          const q = QMAP[v.name] || "auto";
+          const u = cleanStreamUrl2(v.url);
+          streams.push(toStream2("Krmzy", "OK.ru " + (QMAP[v.name] || v.name || ""), failovers.length ? withHost(u, failovers[0]) : u, q, hdr));
+        }
+        return streams;
+      }
+      return [];
     }
     function padHex(hex) {
       let h = String(hex || "").trim().replace(/"/g, "");
@@ -631,7 +694,7 @@ var require_extractor = __commonJS({
         return [];
       }
     }
-    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion: extractDailymotion2, extractMailRuPublic: extractMailRuPublic2, base64Encode, unpackPacked: unpackPacked2, toStream: toStream2, cleanStreamUrl: cleanStreamUrl2, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities: expandM3u8Qualities2, expandFromMasterText: expandFromMasterText2, expandArtRkUrlset: expandArtRkUrlset2 };
+    module2.exports = { extractFromUrl: extractFromUrl2, extractStreamsFromText, extractSmartPlayer, extractDailymotion: extractDailymotion2, extractMailRuPublic: extractMailRuPublic2, extractOkRu: extractOkRu2, base64Encode, htmlUnescape, unpackPacked: unpackPacked2, toStream: toStream2, cleanStreamUrl: cleanStreamUrl2, decryptSmartPlayer, parseMasterPlaylist, expandM3u8Qualities: expandM3u8Qualities2, expandFromMasterText: expandFromMasterText2, expandArtRkUrlset: expandArtRkUrlset2 };
   }
 });
 
@@ -772,7 +835,7 @@ var require_tmdb = __commonJS({
 // src/providers/krmzy.js
 var { fetchText, HEADERS, absoluteUrl } = require_http();
 var cheerio = require("cheerio-without-node-native");
-var { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require_extractor();
+var { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, extractOkRu, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require_extractor();
 var { matchTitle } = require_normalize();
 var { getTitles, getSeasonCounts } = require_tmdb();
 var metadata = {
@@ -1005,6 +1068,22 @@ async function findEpisode(pageUrl, season, episode, continuousNum) {
     return null;
   }
 }
+function normalizeServerLabel(name) {
+  const n = String(name || "").trim();
+  const lower = n.toLowerCase();
+  if (lower === "ok") return "OK.ru";
+  if (lower === "dailymotion") return "Dailymotion";
+  if (lower === "estream") return "eStream";
+  if (lower === "youtube" || lower === "youtube_in") return "YouTube";
+  if (lower === "arab hd" || lower === "arabhd" || lower === "arab-hd") return "Arab HD";
+  if (lower === "red hd" || lower === "redhd" || lower === "red-hd") return "Red HD";
+  if (lower === "pro hd" || lower === "prohd" || lower === "pro-hd") return "Pro HD";
+  if (lower === "express") return "Express";
+  if (lower === "box") return "Box";
+  if (lower === "now") return "Now";
+  if (lower === "facebook") return "Facebook";
+  return n || metadata.name;
+}
 function labelStreams(label, streams) {
   if (!streams || !streams.length) return streams || [];
   return streams.map((s) => {
@@ -1134,6 +1213,7 @@ async function loadLinks(episodeUrl) {
     servers.map(async (item) => {
       const serverType = (item.name || "").toLowerCase().trim();
       const serverIdRaw = item.id || "";
+      const serverLabel = normalizeServerLabel(item.name || serverType);
       let embedUrl = "";
       switch (serverType) {
         case "youtube":
@@ -1185,41 +1265,50 @@ async function loadLinks(episodeUrl) {
           embedUrl = item.codeHref || serverIdRaw;
       }
       if (!embedUrl) return [];
-      if (serverType === "arab hd" || serverType === "arabhd" || serverType === "arab-hd" || serverType === "estream") {
-        try {
-          const extractedM3u8 = await extractLinkFromObfuscatedPage(embedUrl, [mainPageHostReferer, "https://newaat.com/"]);
-          if (!extractedM3u8) return [];
-          probed.add(extractedM3u8);
-          return await resolveHlsRefererAndExpand(extractedM3u8, embedUrl, item.name || serverType);
-        } catch (e) {
-          return [];
-        }
-      } else if (serverType === "youtube" || serverType === "youtube_in") {
-        return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
-      } else if (serverType === "express") {
-        try {
-          if (/cloud\.mail\.ru\/public/.test(embedUrl)) {
-            return labelStreams(item.name || "Express", await extractMailRuPublic(embedUrl, { Referer: mainPageHostReferer }));
+      const result2 = await (async () => {
+        if (serverType === "arab hd" || serverType === "arabhd" || serverType === "arab-hd" || serverType === "estream") {
+          try {
+            const extractedM3u8 = await extractLinkFromObfuscatedPage(embedUrl, [mainPageHostReferer, "https://newaat.com/"]);
+            if (!extractedM3u8) return [];
+            probed.add(extractedM3u8);
+            return await resolveHlsRefererAndExpand(extractedM3u8, embedUrl, item.name || serverType);
+          } catch (e) {
+            return [];
           }
-          return labelStreams(item.name || "Express", await extractFromUrl(embedUrl, mainPageHostReferer));
-        } catch (e) {
-          return [];
+        } else if (serverType === "youtube" || serverType === "youtube_in") {
+          return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
+        } else if (serverType === "express") {
+          try {
+            if (/cloud\.mail\.ru\/public/.test(embedUrl)) {
+              return labelStreams(item.name || "Express", await extractMailRuPublic(embedUrl, { Referer: mainPageHostReferer }));
+            }
+            return labelStreams(item.name || "Express", await extractFromUrl(embedUrl, mainPageHostReferer));
+          } catch (e) {
+            return [];
+          }
+        } else if (serverType === "dailymotion") {
+          try {
+            let dmUrl = embedUrl;
+            if (!/^https?:\/\//i.test(dmUrl)) dmUrl = "https://www.dailymotion.com/video/" + dmUrl;
+            return /dailymotion\.com\/video/.test(dmUrl) ? await extractDailymotion(dmUrl, { Referer: "https://www.dailymotion.com/" }) : await extractFromUrl(dmUrl, mainPageHostReferer);
+          } catch (e) {
+            return [];
+          }
+        } else if (serverType === "ok") {
+          try {
+            return await extractOkRu(embedUrl, mainPageHostReferer);
+          } catch (e) {
+            return [];
+          }
+        } else {
+          try {
+            return labelStreams(item.name || serverType, await extractFromUrl(embedUrl, mainPageHostReferer));
+          } catch (e) {
+            return [];
+          }
         }
-      } else if (serverType === "dailymotion") {
-        try {
-          let dmUrl = embedUrl;
-          if (!/^https?:\/\//i.test(dmUrl)) dmUrl = "https://www.dailymotion.com/video/" + dmUrl;
-          return /dailymotion\.com\/video/.test(dmUrl) ? await extractDailymotion(dmUrl, { Referer: "https://www.dailymotion.com/" }) : await extractFromUrl(dmUrl, mainPageHostReferer);
-        } catch (e) {
-          return [];
-        }
-      } else {
-        try {
-          return labelStreams(item.name || serverType, await extractFromUrl(embedUrl, mainPageHostReferer));
-        } catch (e) {
-          return [];
-        }
-      }
+      })();
+      return (result2 || []).map((s) => Object.assign({}, s, { name: serverLabel }));
     })
   );
   for (const r of serverResults) for (const s of r) streams.push(s);

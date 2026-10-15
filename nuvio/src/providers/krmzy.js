@@ -1,6 +1,6 @@
 const { fetchText, HEADERS, absoluteUrl } = require("../lib/http.js");
 const cheerio = require("cheerio-without-node-native");
-const { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require("../lib/extractor.js");
+const { unpackPacked, extractFromUrl, extractDailymotion, extractMailRuPublic, extractOkRu, toStream, cleanStreamUrl, expandFromMasterText, expandM3u8Qualities, expandArtRkUrlset } = require("../lib/extractor.js");
 const { matchTitle } = require("../lib/normalize.js");
 const { getTitles, getSeasonCounts } = require("../lib/tmdb.js");
 
@@ -292,6 +292,24 @@ async function findEpisode(pageUrl, season, episode, continuousNum) {
   }
 }
 
+// Human-friendly source label shown per stream (Nuvio renders stream.name).
+function normalizeServerLabel(name) {
+  const n = String(name || "").trim();
+  const lower = n.toLowerCase();
+  if (lower === "ok") return "OK.ru";
+  if (lower === "dailymotion") return "Dailymotion";
+  if (lower === "estream") return "eStream";
+  if (lower === "youtube" || lower === "youtube_in") return "YouTube";
+  if (lower === "arab hd" || lower === "arabhd" || lower === "arab-hd") return "Arab HD";
+  if (lower === "red hd" || lower === "redhd" || lower === "red-hd") return "Red HD";
+  if (lower === "pro hd" || lower === "prohd" || lower === "pro-hd") return "Pro HD";
+  if (lower === "express") return "Express";
+  if (lower === "box") return "Box";
+  if (lower === "now") return "Now";
+  if (lower === "facebook") return "Facebook";
+  return n || metadata.name;
+}
+
 function labelStreams(label, streams) {
   if (!streams || !streams.length) return streams || [];
   return streams.map((s) => {
@@ -431,6 +449,7 @@ async function loadLinks(episodeUrl) {
     servers.map(async (item) => {
       const serverType = (item.name || "").toLowerCase().trim();
       const serverIdRaw = item.id || "";
+      const serverLabel = normalizeServerLabel(item.name || serverType);
 
       let embedUrl = "";
       switch (serverType) {
@@ -457,41 +476,51 @@ async function loadLinks(episodeUrl) {
       }
       if (!embedUrl) return [];
 
-      if (serverType === "arab hd" || serverType === "arabhd" || serverType === "arab-hd" || serverType === "estream") {
-        try {
-          const extractedM3u8 = await extractLinkFromObfuscatedPage(embedUrl, [mainPageHostReferer, "https://newaat.com/"]);
-          if (!extractedM3u8) return [];
-          probed.add(extractedM3u8);
-          return await resolveHlsRefererAndExpand(extractedM3u8, embedUrl, item.name || serverType);
-        } catch (e) {
-          return [];
-        }
-      } else if (serverType === "youtube" || serverType === "youtube_in") {
-        return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
-      } else if (serverType === "express") {
-        try {
-          if (/cloud\.mail\.ru\/public/.test(embedUrl)) {
-            return labelStreams(item.name || "Express", await extractMailRuPublic(embedUrl, { Referer: mainPageHostReferer }));
+      const result = await (async () => {
+        if (serverType === "arab hd" || serverType === "arabhd" || serverType === "arab-hd" || serverType === "estream") {
+          try {
+            const extractedM3u8 = await extractLinkFromObfuscatedPage(embedUrl, [mainPageHostReferer, "https://newaat.com/"]);
+            if (!extractedM3u8) return [];
+            probed.add(extractedM3u8);
+            return await resolveHlsRefererAndExpand(extractedM3u8, embedUrl, item.name || serverType);
+          } catch (e) {
+            return [];
           }
-          return labelStreams(item.name || "Express", await extractFromUrl(embedUrl, mainPageHostReferer));
-        } catch (e) {
-          return [];
+        } else if (serverType === "youtube" || serverType === "youtube_in") {
+          return [toStream(metadata.name, "YouTube", embedUrl, "auto", {})];
+        } else if (serverType === "express") {
+          try {
+            if (/cloud\.mail\.ru\/public/.test(embedUrl)) {
+              return labelStreams(item.name || "Express", await extractMailRuPublic(embedUrl, { Referer: mainPageHostReferer }));
+            }
+            return labelStreams(item.name || "Express", await extractFromUrl(embedUrl, mainPageHostReferer));
+          } catch (e) {
+            return [];
+          }
+        } else if (serverType === "dailymotion") {
+          try {
+            let dmUrl = embedUrl;
+            if (!/^https?:\/\//i.test(dmUrl)) dmUrl = "https://www.dailymotion.com/video/" + dmUrl;
+            return /dailymotion\.com\/video/.test(dmUrl) ? await extractDailymotion(dmUrl, { Referer: "https://www.dailymotion.com/" }) : await extractFromUrl(dmUrl, mainPageHostReferer);
+          } catch (e) {
+            return [];
+          }
+        } else if (serverType === "ok") {
+          try {
+            return await extractOkRu(embedUrl, mainPageHostReferer);
+          } catch (e) {
+            return [];
+          }
+        } else {
+          try {
+            return labelStreams(item.name || serverType, await extractFromUrl(embedUrl, mainPageHostReferer));
+          } catch (e) {
+            return [];
+          }
         }
-      } else if (serverType === "dailymotion") {
-        try {
-          let dmUrl = embedUrl;
-          if (!/^https?:\/\//i.test(dmUrl)) dmUrl = "https://www.dailymotion.com/video/" + dmUrl;
-          return /dailymotion\.com\/video/.test(dmUrl) ? await extractDailymotion(dmUrl, { Referer: "https://www.dailymotion.com/" }) : await extractFromUrl(dmUrl, mainPageHostReferer);
-        } catch (e) {
-          return [];
-        }
-      } else {
-        try {
-          return labelStreams(item.name || serverType, await extractFromUrl(embedUrl, mainPageHostReferer));
-        } catch (e) {
-          return [];
-        }
-      }
+      })();
+
+      return (result || []).map((s) => Object.assign({}, s, { name: serverLabel }));
     })
   );
   for (const r of serverResults) for (const s of r) streams.push(s);
